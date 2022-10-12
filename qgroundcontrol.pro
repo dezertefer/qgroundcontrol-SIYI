@@ -13,6 +13,7 @@ QMAKE_PROJECT_DEPTH = 0 # undocumented qmake flag to force absolute paths in mak
 DEFINES += QGC_GST_TAISYNC_DISABLED
 DEFINES += QGC_GST_MICROHARD_DISABLED
 
+
 exists($${OUT_PWD}/qgroundcontrol.pro) {
     error("You must use shadow build (e.g. mkdir build; cd build; qmake ../qgroundcontrol.pro).")
 }
@@ -57,10 +58,10 @@ WindowsBuild {
 # Branding
 #
 
-QGC_APP_NAME        = "QGroundControl"
-QGC_ORG_NAME        = "QGroundControl.org"
+QGC_APP_NAME        = "AeroKontiki"
+QGC_ORG_NAME        = "AeroKontiki"
 QGC_ORG_DOMAIN      = "org.qgroundcontrol"
-QGC_APP_DESCRIPTION = "Open source ground control app provided by QGroundControl dev team"
+QGC_APP_DESCRIPTION = "Open source ground control app provided by QGroundControl and AeroKontiki dev team"
 QGC_APP_COPYRIGHT   = "Copyright (C) 2019 QGroundControl Development Team. All rights reserved."
 
 WindowsBuild {
@@ -354,8 +355,8 @@ CustomBuild {
         RESOURCES += $$PWD/resources/InstrumentValueIcons/InstrumentValueIcons.qrc
     }
 } else {
-    DEFINES += QGC_APPLICATION_NAME=\"\\\"QGroundControl\\\"\"
-    DEFINES += QGC_ORG_NAME=\"\\\"QGroundControl.org\\\"\"
+    DEFINES += QGC_APPLICATION_NAME=\"\\\"AeroKontiki\\\"\"
+    DEFINES += QGC_ORG_NAME=\"\\\"AeroKontiki\\\"\"
     DEFINES += QGC_ORG_DOMAIN=\"\\\"org.qgroundcontrol\\\"\"
     RESOURCES += \
         $$PWD/qgroundcontrol.qrc \
@@ -1468,7 +1469,8 @@ contains (CONFIG, DISABLE_VIDEOSTREAMING) {
 # Otherwise the user can still disable this feature in the user_config.pri file.
 } else:exists(user_config.pri):infile(user_config.pri, DEFINES, DISABLE_VIDEOSTREAMING) {
     message("Skipping support for video streaming (manual override from user_config.pri)")
-} else {
+}
+else {
     include(src/VideoReceiver/VideoReceiver.pri)
 }
 

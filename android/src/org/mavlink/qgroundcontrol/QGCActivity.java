@@ -202,7 +202,7 @@ public class QGCActivity extends QtActivity
         super.onCreate(savedInstanceState);
         nativeInit();
         PowerManager pm = (PowerManager)_instance.getSystemService(Context.POWER_SERVICE);
-        _wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "QGroundControl");
+        _wakeLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "AeroKontiki");
         if(_wakeLock != null) {
             _wakeLock.acquire();
         } else {

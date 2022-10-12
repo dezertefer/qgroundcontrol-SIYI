@@ -665,7 +665,7 @@ Item {
                         visible:            toolStrip._isRallyLayer || toolStrip._isMissionLayer
                         checkable:          true
                     },
-                    ToolStripAction {
+                    /*ToolStripAction {
                         text:               _missionController.isROIActive ? qsTr("Cancel ROI") : qsTr("ROI")
                         iconSource:         "/qmlimages/MapAddMission.svg"
                         enabled:            !_missionController.onlyInsertTakeoffValid
@@ -680,8 +680,8 @@ Item {
                         }
                         property bool myAddROIOnClick: _addROIOnClick
                         onMyAddROIOnClickChanged: checked = _addROIOnClick
-                    },
-                    ToolStripAction {
+                    },*/
+                    /*ToolStripAction {
                         text:               _singleComplexItem ? _missionController.complexMissionItemNames[0] : qsTr("Pattern")
                         iconSource:         "/qmlimages/MapDrawShape.svg"
                         enabled:            _missionController.flyThroughCommandsAllowed
@@ -693,7 +693,7 @@ Item {
                                 insertComplexItemAfterCurrent(_missionController.complexMissionItemNames[0])
                             }
                         }
-                    },
+                    },*/
                     ToolStripAction {
                         text:       _planMasterController.controllerVehicle.multiRotor ? qsTr("Return") : qsTr("Land")
                         iconSource: "/res/rtl.svg"
@@ -766,7 +766,7 @@ Item {
                     height:     planControlColapsed ? colapsedRow.height + ScreenTools.defaultFontPixelHeight : 0
                     color:      qgcPal.missionItemEditor
                     radius:     _radius
-                    visible:    planControlColapsed && _airspaceEnabled
+                    visible:    false//planControlColapsed && _airspaceEnabled
                     Row {
                         id:                     colapsedRow
                         spacing:                ScreenTools.defaultFontPixelWidth
@@ -1046,7 +1046,7 @@ Item {
             }
 
             GridLayout {
-                columns:            2
+                columns:            1
                 columnSpacing:      _margin
                 rowSpacing:         _margin
                 Layout.fillWidth:   true
@@ -1057,7 +1057,7 @@ Item {
 
                     Rectangle {
                         id:     button
-                        width:  ScreenTools.defaultFontPixelHeight * 7
+                        width:  ScreenTools.defaultFontPixelHeight * 10
                         height: planCreatorNameLabel.y + planCreatorNameLabel.height
                         color:  button.pressed || button.highlighted ? qgcPal.buttonHighlight : qgcPal.button
 
@@ -1116,7 +1116,7 @@ Item {
             }
 
             GridLayout {
-                columns:            3
+                columns:            1
                 rowSpacing:         _margin
                 columnSpacing:      ScreenTools.defaultFontPixelWidth
                 visible:            storageSection.visible
@@ -1170,7 +1170,7 @@ Item {
                     }
                 }
 
-                QGCButton {
+                /*QGCButton {
                     Layout.columnSpan:  3
                     Layout.fillWidth:   true
                     text:               qsTr("Save Mission Waypoints As KML...")
@@ -1184,7 +1184,7 @@ Item {
                         dropPanel.hide()
                         _planMasterController.saveKmlToSelectedFile()
                     }
-                }
+                }*/
             }
 
             SectionHeader {
@@ -1193,9 +1193,10 @@ Item {
                 text:               qsTr("Vehicle")
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth:   true
-                spacing:            _margin
+                rowSpacing:         _margin
+                columns:            1
                 visible:            vehicleSection.visible
 
                 QGCButton {

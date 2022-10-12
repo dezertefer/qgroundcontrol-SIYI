@@ -181,7 +181,7 @@ exists ($$PWD/.git) {
         APP_VERSION_STR = "Daily $${GIT_BRANCH}:$${GIT_HASH} $${GIT_TIME}"
     }
 
-    message(QGroundControl APP_VERSION_STR VERSION $${APP_VERSION_STR} $${VERSION})
+    message(AeroKontiki APP_VERSION_STR VERSION $${APP_VERSION_STR} $${VERSION})
 
     MacBuild {
         MAC_VERSION  = $$section(VERSION, ".", 0, 2)
