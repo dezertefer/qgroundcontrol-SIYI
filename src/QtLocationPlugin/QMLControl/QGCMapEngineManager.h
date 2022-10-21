@@ -33,6 +33,7 @@ public:
         ActionNone,
         ActionImporting,
         ActionExporting,
+        ActionGeoserverImporting,
         ActionDone,
     };
     Q_ENUM(ImportAction)
@@ -71,6 +72,7 @@ public:
     Q_INVOKABLE void                selectNone              ();
     Q_INVOKABLE bool                exportSets              (QString path = QString());
     Q_INVOKABLE bool                importSets              (QString path = QString());
+    Q_INVOKABLE bool                importGeoserverSets     (QString path = QString());
     Q_INVOKABLE void                resetAction             ();
 
     quint64                         tileCount               () const{ return _imageSet.tileCount + _elevationSet.tileCount; }

@@ -19,6 +19,8 @@
 #include "QGCApplication.h"
 #include "QGCMapTileSet.h"
 #include "QGCMapUrlEngine.h"
+#include "SettingsManager.h"
+#include "QGeoserverTileSet.h"
 
 #include <QSettings>
 #include <QStorageInfo>
@@ -472,6 +474,51 @@ QGCMapEngineManager::importSets(QString path) {
         return true;
     }
     return false;
+}
+
+bool QGCMapEngineManager::importGeoserverSets(QString path)
+{
+    /*_importAction = ActionNone;
+    emit importActionChanged();
+    QString dir = path;
+
+    QGeoserverTileSet tileSet(path);
+
+    if (tileSet.getState() != QGeoserverTileSet::OK)
+    {
+
+        switch (tileSet.getState()) {
+        case QGeoserverTileSet::DIRECTORY_PATH_IS_EMPTY:
+            qgcApp()->showAppMessage("Geoserver map set directory path is empty");
+            break;
+        case QGeoserverTileSet::DIRECTORY_NOT_EXISTS:
+            qgcApp()->showAppMessage("Geoserver map set directory path is not exists");
+            break;
+        case QGeoserverTileSet::DIRECTORY_IS_EMPTY:
+            qgcApp()->showAppMessage("Geoserver map set directory is empty");
+            break;
+        case QGeoserverTileSet::DIRECTORY_IS_NOT_GEOSERVER_SET:
+            qgcApp()->showAppMessage("Geoserver map set directory path is not set");
+            break;
+        case QGeoserverTileSet::TILES_SET_IS_EMPTY:
+            qgcApp()->showAppMessage("Geoserver map set is empty");
+            break;
+        }
+
+        return false;
+    }
+
+    _importAction = ActionGeoserverImporting;
+    emit importActionChanged();
+    QGCImportGeoserverTileTask* task = new QGCImportGeoserverTileTask(tileSet);
+    connect(task, &QGCImportGeoserverTileTask::actionCompleted, this, &QGCMapEngineManager::_actionCompleted);
+    connect(task, &QGCImportGeoserverTileTask::actionProgress, this, &QGCMapEngineManager::_actionProgressHandler);
+    connect(task, &QGCMapTask::error, this, &QGCMapEngineManager::taskError);
+    getQGCMapEngine()->addTask(task);
+
+
+    qgcApp()->showAppMessage("Geoserver started to import");*/
+    return true;
 }
 
 //-----------------------------------------------------------------------------

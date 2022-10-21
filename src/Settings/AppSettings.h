@@ -94,6 +94,7 @@ public:
     QString videoSavePath       ();
     QString photoSavePath       ();
     QString crashSavePath       ();
+    QString geoserverMapsSavePath();
 
     // Helper methods for working with firstRunPromptIds QVariant settings string list
     static QList<int> firstRunPromptsIdsVariantToList   (const QVariant& firstRunPromptIds);
@@ -120,6 +121,7 @@ public:
     static const char* videoDirectory;
     static const char* photoDirectory;
     static const char* crashDirectory;
+    static const char* geoserverMapsDirectory;
 
     // Returns the current qLocaleLanguage setting bypassing the standard SettingsGroup path. This should only be used
     // by QGCApplication::setLanguage to query the language setting as early in the boot process as possible.

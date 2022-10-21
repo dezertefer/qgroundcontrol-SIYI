@@ -12,6 +12,7 @@ QT  += location-private positioning-private network
 INCLUDEPATH += $$QT.location.includes
 
 HEADERS += \
+    $$PWD/GeoServerMapProvider.h \
     $$PWD/QGCMapEngine.h \
     $$PWD/QGCMapEngineData.h \
     $$PWD/QGCMapTileSet.h \
@@ -31,9 +32,12 @@ HEADERS += \
     $$PWD/EsriMapProvider.h \
     $$PWD/MapboxMapProvider.h \
     $$PWD/QGCTileSet.h \
+    $$PWD/QGeoserverTile.h \
+    $$PWD/QGeoserverTileSet.h
 
 
 SOURCES += \
+    $$PWD/GeoServerMapProvider.cpp \
     $$PWD/QGCMapEngine.cpp \
     $$PWD/QGCMapTileSet.cpp \
     $$PWD/QGCMapUrlEngine.cpp \
@@ -51,6 +55,8 @@ SOURCES += \
     $$PWD/GenericMapProvider.cpp \
     $$PWD/EsriMapProvider.cpp \
     $$PWD/MapboxMapProvider.cpp \
+    $$PWD/QGeoserverTile.cpp \
+    $$PWD/QGeoserverTileSet.cpp
 
 OTHER_FILES += \
     $$PWD/qgc_maps_plugin.json

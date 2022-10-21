@@ -370,7 +370,19 @@ Item {
                         visible:        _esriFact ? _esriFact.visible : false
                         font.pointSize: _adjustableFontPointSize
                     }
+			Item { width: 1; height: 5 }
 
+                    QGCLabel {
+                        anchors.left:   parent.left
+                        anchors.right:  parent.right
+                        wrapMode:       Text.WordWrap
+                        text:           qsTr("Geoserver mapset path(directory):")
+                    }
+
+                    TextField {
+                        id:             gsMapSetPath
+                        onTextChanged:  offlineMapView.geoserverMapSetPath = text
+                    }
                     Item { width: 1; height: 1; visible: _vworldFact ? _vworldFact.visible : false }
                     QGCLabel { text: qsTr("VWorld Access Token"); visible: _vworldFact ? _vworldFact.visible : false }
                     FactTextField {
@@ -1082,6 +1094,13 @@ Item {
                 width:          _buttonSize
                 visible:        QGroundControl.corePlugin.options.showOfflineMapExport
                 onClicked:      showExport()
+            }
+            QGCButton {
+                text:           qsTr("Geoserver")
+                visible:        false
+                width:          _buttonSize
+                onClicked:      QGroundControl.mapEngineManager.importGeoserverSets(geoserverMapSetPath)
+
             }
             QGCButton {
                 text:           qsTr("Options")

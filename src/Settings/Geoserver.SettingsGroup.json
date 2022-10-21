@@ -1,0 +1,61 @@
+[
+{
+    "name":             "visualWMTSVersion",
+    "shortDescription": "Visual map using wtms version",
+    "type":             "uint32",
+    "enumStrings":      "V1_0_0,V1_1_0,V1_1_1,V1_3_0",
+    "enumValues":       "0,1,2,3",
+    "defaultValue":     "0"
+},
+{
+    "name":             "visualImageFormat",
+    "shortDescription": "Visual map using wimage format",
+    "type":             "uint32",
+    "enumStrings":      "png, jpeg",
+    "enumValues":       "0,1",
+    "defaultValue":     "0"
+},
+{
+    "name":             "visualMapWorkspace",
+    "shortDescription": "Visual Map Workspace name",
+    "type":             "string",
+    "defaultValue":     ""
+},
+{
+    "name":             "visualMapName",
+    "shortDescription": "Visual Map name",
+    "type":             "string",
+    "defaultValue":     ""
+},
+{
+    "name":             "visualEPSGNumber",
+    "shortDescription": "Visual map using Mercator name",
+    "type":             "string",
+    "defaultValue":     ""
+},
+{
+    "name":             "elevationWMTSVersion",
+    "type":             "uint32",
+    "enumStrings":      "V1_0_0,V1_1_0,V1_1_1,V1_3_0",
+    "enumValues":       "0,1,2,3",
+    "defaultValue":     "0"
+},
+{
+    "name":             "elevationMapWorkspace",
+    "shortDescription": "Elevation Map Workspace name",
+    "type":             "string",
+    "defaultValue":     ""
+},
+{
+    "name":             "elevationMapName",
+    "shortDescription": "Elevation Map name",
+    "type":             "string",
+    "defaultValue":     ""
+},
+{
+    "name":             "elevationEPSGNumber",
+    "shortDescription": "Elevation map using EPSG number",
+    "type":             "string",
+    "defaultValue":     ""
+}
+]
