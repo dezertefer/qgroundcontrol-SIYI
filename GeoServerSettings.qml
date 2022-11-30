@@ -167,11 +167,12 @@ Rectangle {
                                 fact:   QGroundControl.settingsManager.geoserverSettings.visualEPSGNumber
                             }
                         }
+
                     }
                 }
             }
 
-            Column
+            /*Column
             {
                 id: elevationMapSettingsColumn
                 width:      __geoServerRoot.width * 0.8
@@ -255,7 +256,7 @@ Rectangle {
                         }
                     }
                 }
-            }
+            }*/
         }
     }
 }

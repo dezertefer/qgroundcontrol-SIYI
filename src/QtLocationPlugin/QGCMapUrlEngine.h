@@ -19,6 +19,7 @@
 
 #include "GoogleMapProvider.h"
 #include "BingMapProvider.h"
+#include "GeoServerMapProvider.h"
 #include "GenericMapProvider.h"
 #include "EsriMapProvider.h"
 #include "MapboxMapProvider.h"

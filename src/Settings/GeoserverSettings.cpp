@@ -18,9 +18,10 @@ DECLARE_SETTINGSFACT(GeoserverSettings, visualImageFormat)
 DECLARE_SETTINGSFACT(GeoserverSettings, visualMapWorkspace)
 DECLARE_SETTINGSFACT(GeoserverSettings, visualMapName)
 DECLARE_SETTINGSFACT(GeoserverSettings, visualEPSGNumber)
-
+/*
 DECLARE_SETTINGSFACT(GeoserverSettings, elevationWMTSVersion)
 DECLARE_SETTINGSFACT(GeoserverSettings, elevationMapWorkspace)
 DECLARE_SETTINGSFACT(GeoserverSettings, elevationMapName)
 DECLARE_SETTINGSFACT(GeoserverSettings, elevationEPSGNumber)
+*/
 

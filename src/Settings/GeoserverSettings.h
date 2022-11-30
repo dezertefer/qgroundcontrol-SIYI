@@ -15,9 +15,10 @@ public:
     DEFINE_SETTINGFACT(visualMapName)
     DEFINE_SETTINGFACT(visualEPSGNumber)
 
-    DEFINE_SETTINGFACT(elevationWMTSVersion)
+    /*DEFINE_SETTINGFACT(elevationWMTSVersion)
     DEFINE_SETTINGFACT(elevationMapWorkspace)
     DEFINE_SETTINGFACT(elevationMapName)
     DEFINE_SETTINGFACT(elevationEPSGNumber)
+    */
 };
 

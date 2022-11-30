@@ -1,3 +1,7 @@
+{
+    "version":      1,
+    "fileType":  "FactMetaData",
+    "QGC.MetaData.Facts":
 [
 {
     "name":             "visualWMTSVersion",
@@ -5,7 +9,7 @@
     "type":             "uint32",
     "enumStrings":      "V1_0_0,V1_1_0,V1_1_1,V1_3_0",
     "enumValues":       "0,1,2,3",
-    "defaultValue":     "0"
+    "defaultValue":     "V1_0_0"
 },
 {
     "name":             "visualImageFormat",
@@ -19,43 +23,22 @@
     "name":             "visualMapWorkspace",
     "shortDescription": "Visual Map Workspace name",
     "type":             "string",
-    "defaultValue":     ""
+    "defaultValue":     "nurc"
 },
 {
     "name":             "visualMapName",
     "shortDescription": "Visual Map name",
     "type":             "string",
-    "defaultValue":     ""
+    "defaultValue":     "207(884)"
 },
 {
     "name":             "visualEPSGNumber",
     "shortDescription": "Visual map using Mercator name",
     "type":             "string",
-    "defaultValue":     ""
-},
-{
-    "name":             "elevationWMTSVersion",
-    "type":             "uint32",
-    "enumStrings":      "V1_0_0,V1_1_0,V1_1_1,V1_3_0",
-    "enumValues":       "0,1,2,3",
-    "defaultValue":     "0"
-},
-{
-    "name":             "elevationMapWorkspace",
-    "shortDescription": "Elevation Map Workspace name",
-    "type":             "string",
-    "defaultValue":     ""
-},
-{
-    "name":             "elevationMapName",
-    "shortDescription": "Elevation Map name",
-    "type":             "string",
-    "defaultValue":     ""
-},
-{
-    "name":             "elevationEPSGNumber",
-    "shortDescription": "Elevation map using EPSG number",
-    "type":             "string",
-    "defaultValue":     ""
+    "defaultValue":     "900913"
 }
 ]
+}
+
+
+

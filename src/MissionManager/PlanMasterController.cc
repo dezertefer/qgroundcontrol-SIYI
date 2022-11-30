@@ -639,6 +639,9 @@ void PlanMasterController::_updatePlanCreatorsList(void)
         if (!_planCreators) {
             _planCreators = new QmlObjectListModel(this);
             _planCreators->append(new BlankPlanCreator(this, this));
+            _planCreators->append(new BlankPlanCreator(this, this));
+            _planCreators->append(new BlankPlanCreator(this, this));
+            _planCreators->append(new BlankPlanCreator(this, this));
             //_planCreators->append(new SurveyPlanCreator(this, this));
             //_planCreators->append(new CorridorScanPlanCreator(this, this));
             emit planCreatorsChanged(_planCreators);
