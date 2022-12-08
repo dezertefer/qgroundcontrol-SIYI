@@ -429,6 +429,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 #
 
 HEADERS += \
+    src/PlanView/backend.h \
     src/QmlControls/QmlUnitsConversion.h \
     src/Settings/GeoserverSettings.h \
     src/Vehicle/VehicleEscStatusFactGroup.h \
@@ -444,6 +445,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 }
 
 SOURCES += \
+    src/PlanView/backend.cpp \
     src/Settings/GeoserverSettings.cpp \
     src/Vehicle/VehicleEscStatusFactGroup.cc \
     src/api/QGCCorePlugin.cc \
@@ -1551,3 +1553,7 @@ LinuxBuild {
 
     INSTALLS += target share_qgroundcontrol share_icons share_metainfo share_applications
 }
+
+CONFIG += qmltypes
+QML_IMPORT_NAME = io.qt.examples.backend
+QML_IMPORT_MAJOR_VERSION = 1

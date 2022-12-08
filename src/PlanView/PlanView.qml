@@ -26,6 +26,8 @@ import QGroundControl.Controllers       1.0
 import QGroundControl.ShapeFileHelper   1.0
 import QGroundControl.Airspace          1.0
 import QGroundControl.Airmap            1.0
+import io.qt.examples.backend 1.0
+
 
 Item {
     id: _root
@@ -210,6 +212,8 @@ Item {
         }
     }
 
+
+
     PlanMasterController {
         id:         _planMasterController
         flyView:    false
@@ -311,9 +315,40 @@ Item {
         }
     }
 
+    BackEnd {
+           id: backend
+       }
+
     function insertSimpleItemAfterCurrent(coordinate) {
+        //transfer mapCenter() and click coordinate to cpp class
+        var center = mapCenter()
+        backend.ALat = coordinate.latitude
+        backend.BLat = "KEK"
+
+
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
+       // _missionController.insertTakeoffItem(mapCenter(), nextIndex, true /* makeCurrentItem */)
+        //put takeoff point on the map
+        //put profile angle point on the map (get from cpp)
+        //put drop point on click coordinate SPEED????
+        //put servo drop
+        //put mode change point to RTL
+        //nextIndex += 1
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
+        var ALat = backend.ALat
+        var BLat = backend.BLat
+        console.log(ALat)
+        console.log(BLat)
+        console.log(coordinate.latitude)
+        console.log(coordinate.longitude)
+/*
+        QGCButton {
+            text: backend.userName
+            //placeholderText: qsTr("User name")
+            Layout.fillWidth:   true
+            onClicked: backend.userName = "hui"
+        }
+        */
     }
 
     function insertROIAfterCurrent(coordinate) {
@@ -1132,6 +1167,13 @@ Item {
                     }
                 }*/
 
+
+                QGCButton {
+                    text: backend.userName
+                    //placeholderText: qsTr("User name")
+                    Layout.fillWidth:   true
+                    onClicked: backend.userName = "hui"
+                }
                 QGCButton {
                     text:               qsTr("Open...")
                     Layout.fillWidth:   true
