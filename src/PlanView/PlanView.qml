@@ -321,26 +321,42 @@ Item {
 
     function insertSimpleItemAfterCurrent(coordinate) {
         //transfer mapCenter() and click coordinate to cpp class
-        var center = mapCenter()
-        backend.ALat = coordinate.latitude
-        backend.BLat = "KEK"
+        var vehicleCoordinate = globals.activeVehicle.coordinate
+        backend.A = vehicleCoordinate
 
-
+        backend.B = coordinate
+        console.log(backend.angle)
+         console.log(backend.C)
+        //backend.BAlt = profiles.altitude
+        console.log(QGroundControl.settingsManager.appSettings.defaultMissionItemAltitude.rawValue)
+        console.log(_missionController.hasPosition)
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
-       // _missionController.insertTakeoffItem(mapCenter(), nextIndex, true /* makeCurrentItem */)
+        _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
+
         //put takeoff point on the map
         //put profile angle point on the map (get from cpp)
         //put drop point on click coordinate SPEED????
         //put servo drop
         //put mode change point to RTL
-        //nextIndex += 1
+        nextIndex += 1
+
+        _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
+
+        nextIndex += 1
+
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
-        var ALat = backend.ALat
-        var BLat = backend.BLat
-        console.log(ALat)
-        console.log(BLat)
-        console.log(coordinate.latitude)
-        console.log(coordinate.longitude)
+
+        nextIndex += 1
+
+        _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, true /* makeCurrentItem */)
+
+        nextIndex += 1
+
+        _missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
+        //console.log(backend.A)
+       // console.log(backend.B)
+       // console.log(center)
+       // console.log(coordinate)
 /*
         QGCButton {
             text: backend.userName
@@ -674,7 +690,7 @@ Item {
                         onTriggered:    mainWindow.showFlyView()
                     },
                     ToolStripAction {
-                        text:                   qsTr("File")
+                        text:                   qsTr("Profiles")
                         enabled:                !_planMasterController.syncInProgress
                         visible:                true
                         showAlternateIcon:      _planMasterController.dirty
@@ -682,7 +698,7 @@ Item {
                         alternateIconSource:    "/qmlimages/MapSyncChanged.svg"
                         dropPanelComponent:     syncDropPanel
                     },
-                    ToolStripAction {
+                    /*ToolStripAction {
                         text:       qsTr("Takeoff")
                         iconSource: "/res/takeoff.svg"
                         enabled:    _missionController.isInsertTakeoffValid
@@ -691,14 +707,16 @@ Item {
                             toolStrip.allAddClickBoolsOff()
                             insertTakeItemAfterCurrent()
                         }
-                    },
+                    },*/
                     ToolStripAction {
                         id:                 addWaypointRallyPointAction
-                        text:               _editingLayer == _layerRallyPoints ? qsTr("Rally Point") : qsTr("Waypoint")
+                        text:               _editingLayer == _layerRallyPoints ? qsTr("Rally Point") : qsTr("Drop Point")
                         iconSource:         "/qmlimages/MapAddMission.svg"
-                        enabled:            toolStrip._isRallyLayer ? true : _missionController.flyThroughCommandsAllowed
+                        enabled:            globals.activeVehicle && globals.activeVehicle.coordinate.isValid
                         visible:            toolStrip._isRallyLayer || toolStrip._isMissionLayer
                         checkable:          true
+                        //dropPanelComponent:     syncDropPanel
+
                     },
                     /*ToolStripAction {
                         text:               _missionController.isROIActive ? qsTr("Cancel ROI") : qsTr("ROI")
@@ -729,7 +747,7 @@ Item {
                             }
                         }
                     },*/
-                    ToolStripAction {
+                    /*ToolStripAction {
                         text:       _planMasterController.controllerVehicle.multiRotor ? qsTr("Return") : qsTr("Land")
                         iconSource: "/res/rtl.svg"
                         enabled:    _missionController.isInsertLandValid
@@ -738,7 +756,7 @@ Item {
                             toolStrip.allAddClickBoolsOff()
                             insertLandItemAfterCurrent()
                         }
-                    },
+                    },*/
                     ToolStripAction {
                         text:               qsTr("Center")
                         iconSource:         "/qmlimages/MapCenter.svg"
@@ -1073,85 +1091,18 @@ Item {
                 visible:            _planMasterController.dirty
             }
 
-            SectionHeader {
-                id:                 createSection
-                Layout.fillWidth:   true
-                text:               qsTr("Create Plan")
-                showSpacer:         false
-            }
 
-            GridLayout {
-                columns:            1
-                columnSpacing:      _margin
-                rowSpacing:         _margin
-                Layout.fillWidth:   true
-                visible:            createSection.visible
-
-                Repeater {
-                    model: _planMasterController.planCreators
-
-                    Rectangle {
-                        id:     button
-                        width:  ScreenTools.defaultFontPixelHeight * 10
-                        height: planCreatorNameLabel.y + planCreatorNameLabel.height
-                        color:  button.pressed || button.highlighted ? qgcPal.buttonHighlight : qgcPal.button
-
-                        property bool highlighted: mouseArea.containsMouse
-                        property bool pressed:     mouseArea.pressed
-
-                        Image {
-                            id:                 planCreatorImage
-                            anchors.left:       parent.left
-                            anchors.right:      parent.right
-                            source:             object.imageResource
-                            sourceSize.width:   width
-                            fillMode:           Image.PreserveAspectFit
-                            mipmap:             true
-                        }
-
-                        QGCLabel {
-                            id:                     planCreatorNameLabel
-                            anchors.top:            planCreatorImage.bottom
-                            anchors.left:           parent.left
-                            anchors.right:          parent.right
-                            horizontalAlignment:    Text.AlignHCenter
-                            text:                   object.name
-                            color:                  button.pressed || button.highlighted ? qgcPal.buttonHighlightText : qgcPal.buttonText
-                        }
-
-                        QGCMouseArea {
-                            id:                 mouseArea
-                            anchors.fill:       parent
-                            hoverEnabled:       true
-                            preventStealing:    true
-                            onClicked:          {
-                                if (_planMasterController.containsItems) {
-                                    createPlanRemoveAllPromptDialogMapCenter = _mapCenter()
-                                    createPlanRemoveAllPromptDialogPlanCreator = object
-                                    mainWindow.showComponentDialog(createPlanRemoveAllPromptDialog, qsTr("Create Plan"), mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.No)
-                                } else {
-                                    object.createPlan(_mapCenter())
-                                }
-                                dropPanel.hide()
-                            }
-
-                            function _mapCenter() {
-                                var centerPoint = Qt.point(editorMap.centerViewport.left + (editorMap.centerViewport.width / 2), editorMap.centerViewport.top + (editorMap.centerViewport.height / 2))
-                                return editorMap.toCoordinate(centerPoint, false /* clipToViewPort */)
-                            }
-                        }
-                    }
-                }
-            }
 
             SectionHeader {
                 id:                 storageSection
                 Layout.fillWidth:   true
-                text:               qsTr("Storage")
+                text:               qsTr("Current Profile")
             }
 
+
+
             GridLayout {
-                columns:            1
+                columns:            2
                 rowSpacing:         _margin
                 columnSpacing:      ScreenTools.defaultFontPixelWidth
                 visible:            storageSection.visible
@@ -1168,13 +1119,42 @@ Item {
                 }*/
 
 
-                QGCButton {
+              /*  QGCButton {
                     text: backend.userName
                     //placeholderText: qsTr("User name")
                     Layout.fillWidth:   true
                     onClicked: backend.userName = "hui"
+                }*/
+                QGCLabel
+                {
+                text: qsTr("Takeoff Angle:")
                 }
-                QGCButton {
+                QGCLabel
+                {
+                    text: qsTr("10")
+
+                }
+                QGCLabel
+                {
+                text: qsTr("Mission Altitude:")
+                }
+                QGCLabel
+                {
+                    text: qsTr("20")
+
+                }
+                QGCLabel
+                {
+                text: qsTr("Mission Speed:")
+                }
+                QGCLabel
+                {
+                    text: qsTr("12")
+
+                }
+
+
+               /* QGCButton {
                     text:               qsTr("Open...")
                     Layout.fillWidth:   true
                     enabled:            !_planMasterController.syncInProgress
@@ -1210,7 +1190,7 @@ Item {
                         dropPanel.hide()
                         _planMasterController.saveToSelectedFile()
                     }
-                }
+                }*/
 
                 /*QGCButton {
                     Layout.columnSpan:  3
@@ -1227,6 +1207,53 @@ Item {
                         _planMasterController.saveKmlToSelectedFile()
                     }
                 }*/
+            }
+
+            SectionHeader {
+                id:                 createSection
+                Layout.fillWidth:   true
+                text:               qsTr("Create Profile")
+                showSpacer:         false
+            }
+
+            GridLayout {
+                columns:            1
+                columnSpacing:      _margin
+                rowSpacing:         _margin
+                Layout.fillWidth:   true
+                visible:            createSection.visible
+
+                QGCButton {
+                    text:               qsTr("New Profile")
+                    Layout.fillWidth:   true
+                    enabled:            true
+                    onClicked: {
+                        dropPanel.hide()
+
+                    }
+                }
+                QGCButton {
+                    text:               qsTr("Edit Current Profile")
+                    Layout.fillWidth:   true
+                    enabled:            true
+                    onClicked: {
+                        dropPanel.hide()
+
+                    }
+                }
+            }
+
+            SectionHeader {
+                id:                 profilesSection
+                Layout.fillWidth:   true
+                text:               qsTr("Saved Profiles")
+            }
+
+            GridLayout {
+                columns:            2
+                rowSpacing:         _margin
+                columnSpacing:      ScreenTools.defaultFontPixelWidth
+                visible:            storageSection.visible
             }
 
             SectionHeader {

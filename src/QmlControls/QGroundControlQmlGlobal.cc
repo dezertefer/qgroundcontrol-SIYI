@@ -238,6 +238,7 @@ void QGroundControlQmlGlobal::setFlightMapPosition(QGeoCoordinate& coordinate)
 
 void QGroundControlQmlGlobal::setFlightMapZoom(double zoom)
 {
+   //int kek = zoom;
     if (zoom != flightMapZoom()) {
         _zoom = zoom;
         QSettings settings;

@@ -469,7 +469,7 @@
             "category":     "Advanced",
             "param1": {
                 "label":            "Mode",
-                "default":          0,
+                "default":          6,
                 "decimalPlaces":    0
             },
             "param2": {
@@ -593,12 +593,12 @@
             "friendlyEdit": true,
             "param1": {
                 "label":            "Servo",
-                "default":          1,
+                "default":          6,
                 "decimalPlaces":    0
             },
             "param2": {
                 "label":            "PWM",
-                "default":          1500,
+                "default":          1111,
                 "decimalPlaces":    0
             }
         },

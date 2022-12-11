@@ -1,5 +1,9 @@
 #include "backend.h"
 #include <QGeoCoordinate>
+#include <QtMath>
+#include "QGCApplication.h"
+#include "SettingsManager.h"
+#include "AppSettings.h"
 
 BackEnd::BackEnd(QObject *parent) :
     QObject(parent)
@@ -9,13 +13,14 @@ BackEnd::BackEnd(QObject *parent) :
 
 QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
 {
-    A.setLatitude(12);
-    A.setLongitude(10);
-    B.setLatitude(30);
-    B.setLongitude(40);
     QGeoCoordinate C;
-    qreal direction = A.distanceTo(B);
-    m_direction = direction;
+    double direction = A.azimuthTo(B);
+    double Balt = 60;//B.altitude();
+    double angle = qDegreesToRadians(45.0);
+    double distance = Balt/qTan(angle);
+    C = A.atDistanceAndAzimuth(distance,direction,Balt);
+    m_C=C;
+    m_direction = distance;
     return C;
 }
 
@@ -25,81 +30,26 @@ QString BackEnd::userName()
     return m_userName;
 }
 
-QString BackEnd::ALat()
+double BackEnd::angle()
 {
-    return m_ALat;
+    BackEnd::calculateC(m_A, m_B);
+    qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(10);
+    return m_direction;
 }
 
-QString BackEnd::BLat()
+QGeoCoordinate BackEnd::A()
 {
-    return m_BLat;
-}
-QString BackEnd::CLat()
-{
-    return m_CLat;
+    return m_A;
 }
 
-
-QString BackEnd::ALon()
+QGeoCoordinate BackEnd::B()
 {
-    return m_ALon;
+    return m_B;
 }
 
-QString BackEnd::BLon()
+QGeoCoordinate BackEnd::C()
 {
-    return m_BLon;
-}
-
-
-QString BackEnd::CLon()
-{
-    return m_CLon;
-}
-
-
-QString BackEnd::BAlt()
-{
-    return m_BAlt;
-}
-
-QString BackEnd::CAlt()
-{
-    return m_CAlt;
-}
-
-
-void BackEnd::setALat(const QString &ALat)
-{
-    if (ALat == m_ALat)
-        return;
-
-    m_ALat = ALat;
-    double lat = m_ALat.toDouble();
-    m_A.setLatitude(lat);
-
-    emit ALatChanged();
-}
-
-void BackEnd::setALon(const QString &ALon)
-{
-    if (ALon == m_ALon)
-        return;
-
-    m_ALon = ALon;
-    double lon = m_ALon.toDouble();
-    m_A.setLongitude(lon);
-
-    emit ALonChanged();
-}
-
-
-void BackEnd::setBLat(const QString &BLat)
-{
-    if (BLat == m_BLat)
-        return;
-
-    m_BLat = BLat;
-    emit ALatChanged();
+    return m_C;
 }
 
 void BackEnd::setUserName(const QString &userName)
@@ -111,12 +61,34 @@ void BackEnd::setUserName(const QString &userName)
     emit userNameChanged();
 }
 
-
-
-void BackEnd::setAngle(int newAngle)
+void BackEnd::setAngle(double &newAngle)
 {
     if (m_angle == newAngle)
         return;
     m_angle = newAngle;
     emit angleChanged();
+}
+
+void BackEnd::setA(const QGeoCoordinate &newA)
+{
+    if (m_A == newA)
+        return;
+    m_A = newA;
+    emit AChanged();
+}
+
+void BackEnd::setB(const QGeoCoordinate &newB)
+{
+    if (m_B == newB)
+        return;
+    m_B = newB;
+    emit BChanged();
+}
+
+void BackEnd::setC(const QGeoCoordinate &newC)
+{
+    if (m_C == newC)
+        return;
+    m_C = newC;
+    emit CChanged();
 }

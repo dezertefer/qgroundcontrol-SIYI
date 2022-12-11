@@ -106,6 +106,7 @@ public:
     Q_PROPERTY(bool                 isROIActive                     MEMBER _isROIActive                 NOTIFY isROIActiveChanged)
     Q_PROPERTY(bool                 isROIBeginCurrentItem           MEMBER _isROIBeginCurrentItem       NOTIFY isROIBeginCurrentItemChanged)
     Q_PROPERTY(bool                 flyThroughCommandsAllowed       MEMBER _flyThroughCommandsAllowed   NOTIFY flyThroughCommandsAllowedChanged)
+    Q_PROPERTY(bool                 hasPosition                     READ hasPosition                    WRITE setHasPosition NOTIFY hasPositionChanged)
     Q_PROPERTY(double               minAMSLAltitude                 MEMBER _minAMSLAltitude             NOTIFY minAMSLAltitudeChanged)          ///< Minimum altitude associated with this mission. Used to calculate percentages for terrain status.
     Q_PROPERTY(double               maxAMSLAltitude                 MEMBER _maxAMSLAltitude             NOTIFY maxAMSLAltitudeChanged)          ///< Maximum altitude associated with this mission. Used to calculate percentages for terrain status.
 
@@ -120,6 +121,12 @@ public:
     ///     @param makeCurrentItem: true: Make this item the current item
     /// @return Newly created item
     Q_INVOKABLE VisualMissionItem* insertSimpleMissionItem(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
+
+    Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemServo(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
+
+    Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemMode(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
+
+
 
     /// Add a new takeoff item to the list
     ///     @param coordinate: Coordinate for item
@@ -254,9 +261,13 @@ public:
 
     bool isEmpty                    (void) const;
 
+
     QGroundControlQmlGlobal::AltMode globalAltitudeMode(void);
     QGroundControlQmlGlobal::AltMode globalAltitudeModeDefault(void);
     void setGlobalAltitudeMode(QGroundControlQmlGlobal::AltMode altMode);
+
+    bool hasPosition() const;
+    void setHasPosition(bool newHasPosition);
 
 signals:
     void visualItemsChanged                 (void);
@@ -298,6 +309,8 @@ signals:
     void _recalcMissionFlightStatusSignal   (void);
     void _recalcFlightPathSegmentsSignal    (void);
     void globalAltitudeModeChanged          (void);
+
+    void hasPositionChanged();
 
 private slots:
     void _newMissionItemsAvailableFromVehicle   (bool removeAllRequested);
@@ -419,4 +432,5 @@ private:
     static const char*  _jsonComplexItemsKey;
 
     static const int    _missionFileVersion;
+    bool m_hasPosition ;
 };

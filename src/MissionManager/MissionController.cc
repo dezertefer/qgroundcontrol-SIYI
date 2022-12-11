@@ -357,13 +357,24 @@ VisualMissionItem* MissionController::insertSimpleMissionItem(QGeoCoordinate coo
     return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_NAV_WAYPOINT, visualItemIndex, makeCurrentItem);
 }
 
+VisualMissionItem* MissionController::insertSimpleMissionItemServo(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
+{
+    return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_DO_SET_SERVO, visualItemIndex, makeCurrentItem);
+}
+
+VisualMissionItem* MissionController::insertSimpleMissionItemMode(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
+{
+    return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_DO_SET_MODE, visualItemIndex, makeCurrentItem);
+}
+
+
 VisualMissionItem* MissionController::insertTakeoffItem(QGeoCoordinate /*coordinate*/, int visualItemIndex, bool makeCurrentItem)
 {
     int sequenceNumber = _nextSequenceNumber();
     _takeoffMissionItem = new TakeoffMissionItem(_controllerVehicle->vtol() ? MAV_CMD_NAV_VTOL_TAKEOFF : MAV_CMD_NAV_TAKEOFF, _masterController, _flyView, _settingsItem, false /* forLoad */);
     _takeoffMissionItem->setSequenceNumber(sequenceNumber);
     _initVisualItem(_takeoffMissionItem);
-
+    _takeoffMissionItem->altitude()->setRawValue(2.0);
     if (_takeoffMissionItem->specifiesAltitude()) {
         double                              prevAltitude;
         QGroundControlQmlGlobal::AltMode    prevAltMode;
@@ -1268,6 +1279,7 @@ void MissionController::_recalcFlightPathSegments(void)
     bool                previousItemIsIncomplete =  false;
     bool                signalSplitSegmentChanged = false;
 
+    setHasPosition(homePositionValid);
     qCDebug(MissionControllerLog) << "_recalcFlightPathSegments homePositionValid" << homePositionValid;
     qDebug() << "_recalcFlightPathSegments homePositionValid" << homePositionValid;
 
@@ -1458,6 +1470,7 @@ void MissionController::_recalcFlightPathSegments(void)
     }
 
     emit waypointPathChanged();
+    emit hasPositionChanged();
     emit recalcTerrainProfile();
     if (signalSplitSegmentChanged) {
         emit splitSegmentChanged();
@@ -2373,6 +2386,9 @@ void MissionController::setCurrentPlanViewSeqNum(int sequenceNumber, bool force)
         int     takeoffSeqNum =         -1;
         int     landSeqNum =            -1;
         int     lastFlyThroughSeqNum =  -1;
+        bool    pV =  _settingsItem->coordinate().isValid();
+
+        setHasPosition(pV);
 
         _splitSegment =                 nullptr;
         _currentPlanViewItem  =         nullptr;
@@ -2527,6 +2543,7 @@ void MissionController::setCurrentPlanViewSeqNum(int sequenceNumber, bool force)
         emit currentPlanViewItemChanged();
         emit splitSegmentChanged();
         emit onlyInsertTakeoffValidChanged();
+        emit hasPositionChanged();
         emit isInsertTakeoffValidChanged();
         emit isInsertLandValidChanged();
         emit isROIActiveChanged();
@@ -2699,4 +2716,17 @@ void MissionController::setGlobalAltitudeMode(QGroundControlQmlGlobal::AltMode a
         _globalAltMode = altMode;
         emit globalAltitudeModeChanged();
     }
+}
+
+bool MissionController::hasPosition() const
+{
+    return m_hasPosition;
+}
+
+void MissionController::setHasPosition(bool newHasPosition)
+{
+    if (m_hasPosition == newHasPosition)
+        return;
+    m_hasPosition = newHasPosition;
+    emit hasPositionChanged();
 }
