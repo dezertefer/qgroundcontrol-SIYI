@@ -103,6 +103,7 @@
 #include "VehicleLinkManager.h"
 #include "Autotune.h"
 
+
 #if defined(QGC_ENABLE_PAIRING)
 #include "PairingManager.h"
 #endif

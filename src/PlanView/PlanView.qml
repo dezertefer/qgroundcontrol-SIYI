@@ -1152,6 +1152,16 @@ Item {
                     text: qsTr("12")
 
                 }
+                QGCLabel
+                {
+                text: qsTr("Whinch profile:")
+                }
+                QGCLabel
+                {
+                    text: qsTr("Power reel")
+
+                }
+
 
 
                /* QGCButton {

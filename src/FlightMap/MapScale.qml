@@ -207,7 +207,7 @@ Item {
         width:              height
         opacity:            0.75
         visible:            _zoomButtonsVisible
-        onClicked:          mapControl.zoomLevel += 0.5
+        onClicked:          mapControl.zoomLevel += 1
     }
 
     QGCButton {
@@ -220,7 +220,7 @@ Item {
         width:              height
         opacity:            0.75
         visible:            _zoomButtonsVisible
-        onClicked:          mapControl.zoomLevel -= 0.5
+        onClicked:          mapControl.zoomLevel -= 1
     }
 
     Component.onCompleted: {

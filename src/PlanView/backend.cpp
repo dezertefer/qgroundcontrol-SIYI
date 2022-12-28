@@ -4,6 +4,10 @@
 #include "QGCApplication.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
+#include <QtXml>
+#include <QtCore>
+#include <iostream>
+#include <QIODevice>
 
 BackEnd::BackEnd(QObject *parent) :
     QObject(parent)
@@ -11,8 +15,56 @@ BackEnd::BackEnd(QObject *parent) :
 
 }
 
+
+
+
+
+
+
+
+void CreateJson()
+{
+    QString path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/test.json";
+    QFile file_obj(path);
+    if(!file_obj.open(QIODevice::ReadOnly)){
+        qDebug()<<"Failed to open "<<path;
+       // exit(1);
+    }
+
+    QTextStream file_text(&file_obj);
+    QString json_string;
+    json_string = file_text.readAll();
+    file_obj.close();
+    QByteArray json_bytes = json_string.toLocal8Bit();
+
+    auto json_doc=QJsonDocument::fromJson(json_bytes);
+
+    if(json_doc.isNull()){
+        qDebug()<<"Failed to create JSON doc.";
+        //exit(2);
+    }
+    if(!json_doc.isObject()){
+        qDebug()<<"JSON is not an object.";
+        //exit(3);
+    }
+
+    QJsonObject json_obj=json_doc.object();
+
+    if(json_obj.isEmpty()){
+        qDebug()<<"JSON object is empty.";
+        //exit(4);
+    }
+
+    QVariantMap json_map = json_obj.toVariantMap();
+    qDebug()<< json_map["altitude"].toString();
+    qDebug()<< json_map["test"].toString();
+}
+
+
+
 QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
 {
+   // CreateJson();
     QGeoCoordinate C;
     double direction = A.azimuthTo(B);
     double Balt = 60;//B.altitude();
@@ -24,11 +76,15 @@ QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
     return C;
 }
 
+
+
 QString BackEnd::userName()
 {
     m_userName = QString::number(m_direction);
     return m_userName;
 }
+
+
 
 double BackEnd::angle()
 {

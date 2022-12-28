@@ -23,7 +23,7 @@ public:
     explicit BackEnd(QObject *parent = nullptr);
 
     QString userName();
-
+    void CreateJson();
     QGeoCoordinate A();
     QGeoCoordinate B();
     QGeoCoordinate C();

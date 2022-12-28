@@ -1532,6 +1532,12 @@ contains (CONFIG, QGC_DISABLE_INSTALLER_SETUP) {
 
 DISTFILES += \
     GeoServerSettings.qml \
+    android/build.gradle \
+    android/gradle.properties \
+    android/gradle/wrapper/gradle-wrapper.jar \
+    android/gradle/wrapper/gradle-wrapper.properties \
+    android/gradlew \
+    android/gradlew.bat \
     src/QmlControls/QGroundControl/Specific/qmldir \
     src/Settings/Geoserver.SettingsGroup.json
 
@@ -1557,3 +1563,4 @@ LinuxBuild {
 CONFIG += qmltypes
 QML_IMPORT_NAME = io.qt.examples.backend
 QML_IMPORT_MAJOR_VERSION = 1
+android: include(C:/Users/Home/AppData/Local/Android/Sdk/android_openssl/openssl.pri)

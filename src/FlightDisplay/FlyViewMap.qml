@@ -91,6 +91,7 @@ FlightMap {
 
     onZoomLevelChanged: {
         if (_saveZoomLevelSetting) {
+
             QGroundControl.flightMapZoom = zoomLevel
             updateAirspace(false)
         }
