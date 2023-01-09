@@ -26,7 +26,7 @@ import QGroundControl.Controllers       1.0
 import QGroundControl.ShapeFileHelper   1.0
 import QGroundControl.Airspace          1.0
 import QGroundControl.Airmap            1.0
-import io.qt.examples.backend 1.0
+import io.qt.examples.backend           1.0
 
 
 Item {
@@ -80,6 +80,8 @@ Item {
             }
         }
     }
+
+
 
     property bool _firstMissionLoadComplete:    false
     property bool _firstFenceLoadComplete:      false
@@ -319,6 +321,7 @@ Item {
            id: backend
        }
 
+
     function insertSimpleItemAfterCurrent(coordinate) {
         //transfer mapCenter() and click coordinate to cpp class
         var vehicleCoordinate = globals.activeVehicle.coordinate
@@ -333,11 +336,6 @@ Item {
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
         _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
 
-        //put takeoff point on the map
-        //put profile angle point on the map (get from cpp)
-        //put drop point on click coordinate SPEED????
-        //put servo drop
-        //put mode change point to RTL
         nextIndex += 1
 
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
@@ -353,18 +351,7 @@ Item {
         nextIndex += 1
 
         _missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
-        //console.log(backend.A)
-       // console.log(backend.B)
-       // console.log(center)
-       // console.log(coordinate)
-/*
-        QGCButton {
-            text: backend.userName
-            //placeholderText: qsTr("User name")
-            Layout.fillWidth:   true
-            onClicked: backend.userName = "hui"
-        }
-        */
+
     }
 
     function insertROIAfterCurrent(coordinate) {
@@ -713,7 +700,7 @@ Item {
                         text:               _editingLayer == _layerRallyPoints ? qsTr("Rally Point") : qsTr("Drop Point")
                         iconSource:         "/qmlimages/MapAddMission.svg"
                         enabled:            globals.activeVehicle && globals.activeVehicle.coordinate.isValid
-                        visible:            toolStrip._isRallyLayer || toolStrip._isMissionLayer
+                        visible:            true//toolStrip._isRallyLayer || toolStrip._isMissionLayer
                         checkable:          true
                         //dropPanelComponent:     syncDropPanel
 
@@ -788,6 +775,7 @@ Item {
             anchors.bottom:     parent.bottom
             anchors.right:      parent.right
             anchors.rightMargin: _toolsMargin
+            visible: false
         }
         //-------------------------------------------------------
         // Right Panel Controls
@@ -959,7 +947,7 @@ Item {
             anchors.margins:    _toolsMargin
             anchors.leftMargin: 0
             anchors.left:       mapScale.left
-            anchors.right:      rightPanel.left
+            anchors.right:      parrent.right
             anchors.bottom:     parent.bottom
             height:             ScreenTools.defaultFontPixelHeight * 7
             missionController:  _missionController
@@ -1083,7 +1071,7 @@ Item {
 
             QGCLabel {
                 id:                 unsavedChangedLabel
-                Layout.fillWidth:   true
+                //Layout.fillWidth:   true
                 wrapMode:           Text.WordWrap
                 text:               globals.activeVehicle ?
                                         qsTr("You have unsaved changes. You should upload to your vehicle, or save to a file.") :
@@ -1096,8 +1084,10 @@ Item {
             SectionHeader {
                 id:                 storageSection
                 Layout.fillWidth:   true
-                text:               qsTr("Current Profile")
+                text:               qsTr("Current Profile "+_planViewSettings.currentProfileName.rawValue)
             }
+
+
 
 
 
@@ -1131,7 +1121,7 @@ Item {
                 }
                 QGCLabel
                 {
-                    text: qsTr("10")
+                    text: _planViewSettings.currentProfileAngle.rawValue
 
                 }
                 QGCLabel
@@ -1140,7 +1130,7 @@ Item {
                 }
                 QGCLabel
                 {
-                    text: qsTr("20")
+                    text: _planViewSettings.currentProfileAlt.rawValue
 
                 }
                 QGCLabel
@@ -1149,8 +1139,16 @@ Item {
                 }
                 QGCLabel
                 {
-                    text: qsTr("12")
+                    text: _planViewSettings.currentProfileSpeed.rawValue
 
+                }
+                QGCLabel
+                {
+                text: qsTr("Whinch profile:")
+                }
+                QGCLabel
+                {
+                    text: _planViewSettings.currentProfileWhinch.rawValue
                 }
 
 
@@ -1209,25 +1207,45 @@ Item {
                 }*/
             }
 
-            SectionHeader {
-                id:                 createSection
-                Layout.fillWidth:   true
-                text:               qsTr("Create Profile")
-                showSpacer:         false
-            }
+
+
+
 
             GridLayout {
                 columns:            1
                 columnSpacing:      _margin
                 rowSpacing:         _margin
                 Layout.fillWidth:   true
-                visible:            createSection.visible
+                visible:            true//createSection.visible
+
+                QGCLabel
+                {
+                    text: qsTr("Select profile")
+                }
+
+                QGCComboBox
+                {
+
+                    id: scale
+                    Layout.fillWidth: true
+                    currentIndex: -1
+                    //text: _planViewSettings.currentProfileName.rawValue
+                    model: backend.profileList
+                    onActivated:
+                        {
+                            console.log(scale.currentText)
+                            backend.currentProfile=scale.currentText
+                        }
+                }
 
                 QGCButton {
+                    id: testBut
                     text:               qsTr("New Profile")
                     Layout.fillWidth:   true
                     enabled:            true
                     onClicked: {
+                        //testBut.text=scale.currentText
+                        //console.log(backend.profile[0])
                         dropPanel.hide()
 
                     }
@@ -1237,17 +1255,23 @@ Item {
                     Layout.fillWidth:   true
                     enabled:            true
                     onClicked: {
+
+                        dropPanel.hide()
+
+                    }
+                }
+                QGCButton {
+                    text:               qsTr("Delete profile")
+                    Layout.fillWidth:   true
+                    enabled:            true
+                    onClicked: {
                         dropPanel.hide()
 
                     }
                 }
             }
 
-            SectionHeader {
-                id:                 profilesSection
-                Layout.fillWidth:   true
-                text:               qsTr("Saved Profiles")
-            }
+
 
             GridLayout {
                 columns:            2
@@ -1259,13 +1283,13 @@ Item {
             SectionHeader {
                 id:                 vehicleSection
                 Layout.fillWidth:   true
-                text:               qsTr("Vehicle")
+                text:               qsTr("Mission")
             }
 
             GridLayout {
                 Layout.fillWidth:   true
                 rowSpacing:         _margin
-                columns:            1
+                columns:            2
                 visible:            vehicleSection.visible
 
                 QGCButton {

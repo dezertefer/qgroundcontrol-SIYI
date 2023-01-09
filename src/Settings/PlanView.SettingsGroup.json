@@ -40,6 +40,45 @@
     "default":      300.0,
     "units":        "m",
     "min":          100.0
+},
+{
+    "name":         "currentProfileName",
+    "shortDesc":    "Profile name",
+    "type":         "string",
+    "default":      "default"
+},
+{
+    "name":         "currentProfileAlt",
+    "shortDesc":    "Profile Altitude",
+    "type":         "double",
+    "default":      20.0,
+    "units":        "m",
+    "min":          5.0,
+    "max":          60.0
+},
+{
+    "name":         "currentProfileSpeed",
+    "shortDesc":    "Profile Speed",
+    "type":         "double",
+    "default":      5.0,
+    "units":        "m/s",
+    "min":          2.0,
+    "max":          12.0
+},
+{
+    "name":         "currentProfileAngle",
+    "shortDesc":    "Profile Angle",
+    "type":         "double",
+    "default":      30.0,
+    "units":        "degree",
+    "min":          15.0,
+    "max":          45.0
+},
+{
+    "name":         "currentProfileWhinch",
+    "shortDesc":    "Profile Whinch",
+    "type":         "string",
+    "default":      "TODO"
 }
 ]
 }

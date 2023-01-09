@@ -437,7 +437,7 @@ HEADERS += \
     src/api/QGCOptions.h \
     src/api/QGCSettings.h \
     src/api/QmlComponentInfo.h \
-    src/GPS/Drivers/src/base_station.h \
+    src/GPS/Drivers/src/base_station.h
 
 contains (DEFINES, QGC_ENABLE_PAIRING) {
     HEADERS += \
@@ -451,7 +451,7 @@ SOURCES += \
     src/api/QGCCorePlugin.cc \
     src/api/QGCOptions.cc \
     src/api/QGCSettings.cc \
-    src/api/QmlComponentInfo.cc \
+    src/api/QmlComponentInfo.cc
 
 contains (DEFINES, QGC_ENABLE_PAIRING) {
     SOURCES += \
@@ -1557,3 +1557,4 @@ LinuxBuild {
 CONFIG += qmltypes
 QML_IMPORT_NAME = io.qt.examples.backend
 QML_IMPORT_MAJOR_VERSION = 1
+

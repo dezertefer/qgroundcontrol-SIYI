@@ -26,4 +26,13 @@ public:
     DEFINE_SETTINGFACT(takeoffItemNotRequired)
     DEFINE_SETTINGFACT(showGimbalOnlyWhenSet)
     DEFINE_SETTINGFACT(vtolTransitionDistance)
+    DEFINE_SETTINGFACT(currentProfileName)
+    DEFINE_SETTINGFACT(currentProfileAlt)
+    DEFINE_SETTINGFACT(currentProfileSpeed)
+    DEFINE_SETTINGFACT(currentProfileAngle)
+    DEFINE_SETTINGFACT(currentProfileWhinch)
+
+
+
+
 };

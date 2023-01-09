@@ -71,7 +71,6 @@
 #endif
 #include "HorizontalFactValueGrid.h"
 #include "InstrumentValueData.h"
-#include "AppMessages.h"
 #include "SimulatedPosition.h"
 #include "PositionManager.h"
 #include "FollowMe.h"
@@ -102,6 +101,7 @@
 #include "QGCMAVLink.h"
 #include "VehicleLinkManager.h"
 #include "Autotune.h"
+#include "backend.h"
 
 #if defined(QGC_ENABLE_PAIRING)
 #include "PairingManager.h"
@@ -280,6 +280,10 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     QSettings settings;
     qDebug() << "Settings location" << settings.fileName() << "Is writable?:" << settings.isWritable();
 
+
+
+
+
 #ifdef UNITTEST_BUILD
     if (!settings.isWritable()) {
         qWarning() << "Setings location is not writable";
@@ -352,6 +356,9 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
 
     _toolbox = new QGCToolbox(this);
     _toolbox->setChildToolboxes();
+    QString path = _toolbox->settingsManager()->appSettings()->profileDirectorySavePath();
+    //qDebug()<< path;
+    //BackEnd f;
 
 #ifndef __mobile__
     _gpsRtkFactGroup = new GPSRTKFactGroup(this);
@@ -380,6 +387,9 @@ void QGCApplication::_exitWithError(QString errorMessage)
 
 void QGCApplication::setLanguage()
 {
+
+    //Profiles f;
+    //f;
     _locale = QLocale::system();
     qDebug() << "System reported locale:" << _locale << "; Name" << _locale.name() << "; Preffered (used in maps): " << (QLocale::system().uiLanguages().length() > 0 ? QLocale::system().uiLanguages()[0] : "None");
 
@@ -590,6 +600,7 @@ bool QGCApplication::_initForNormalAppBoot()
     }
 
     settings.sync();
+
     return true;
 }
 

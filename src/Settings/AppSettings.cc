@@ -35,6 +35,7 @@ const char* AppSettings::videoDirectory =           QT_TRANSLATE_NOOP("AppSettin
 const char* AppSettings::photoDirectory =           QT_TRANSLATE_NOOP("AppSettings", "Photo");
 const char* AppSettings::crashDirectory =           QT_TRANSLATE_NOOP("AppSettings", "CrashLogs");
 const char* AppSettings::geoserverMapsDirectory =   "GeoserverMaps";
+const char* AppSettings::profileDirectory =   QT_TRANSLATE_NOOP("AppSettings", "Profiles");
 
 // Release languages are 90%+ complete
 QList<int> AppSettings::_rgReleaseLanguages = {
@@ -219,6 +220,7 @@ void AppSettings::_checkSavePathDirectories(void)
         savePathDir.mkdir(photoDirectory);
         savePathDir.mkdir(crashDirectory);
         savePathDir.mkdir(geoserverMapsDirectory);
+        savePathDir.mkdir(profileDirectory);
     }
 }
 
@@ -286,12 +288,22 @@ QString AppSettings::photoSavePath(void)
     }
     return QString();
 }
-QString AppSettings::geoserverMapsSavePath()
+QString AppSettings::geoserverMapsSavePath(void)
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
         QDir dir(path);
         return dir.filePath(geoserverMapsDirectory);
+    }
+    return QString();
+}
+
+QString AppSettings::profileDirectorySavePath(void)
+{
+    QString path = savePath()->rawValue().toString();
+    if (!path.isEmpty() && QDir(path).exists()) {
+        QDir dir(path);
+        return dir.filePath(profileDirectory);
     }
     return QString();
 }
