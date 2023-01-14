@@ -55,6 +55,7 @@ Item {
     property var    _appSettings:                       QGroundControl.settingsManager.appSettings
     property var    _planViewSettings:                  QGroundControl.settingsManager.planViewSettings
     property bool   _promptForPlanUsageShowing:         false
+    property real   _valueFieldWidth:                   ScreenTools.defaultFontPixelWidth * 7
 
     readonly property var       _layers:                [_layerMission, _layerGeoFence, _layerRallyPoints]
 
@@ -1084,9 +1085,29 @@ Item {
             SectionHeader {
                 id:                 storageSection
                 Layout.fillWidth:   true
-                text:               qsTr("Current Profile "+_planViewSettings.currentProfileName.rawValue)
+                text:               qsTr("Current Profile "/*+_planViewSettings.currentProfileName.rawValue*/)
             }
 
+            QGCComboBox
+            {
+
+                id: scale
+                Layout.fillWidth: true
+                //currentIndex: -1
+                //currentText: "Select Profile"
+                //text: _planViewSettings.currentProfileName.rawValue
+                model: backend.profileList
+                Component.onCompleted:
+                {
+                    currentIndex = find(_planViewSettings.currentProfileName.rawValue)
+
+                }
+                onActivated:
+                    {
+                        console.log(scale.currentText)
+                        backend.currentProfile=scale.currentText
+                    }
+            }
 
 
 
@@ -1119,10 +1140,22 @@ Item {
                 {
                 text: qsTr("Takeoff Angle:")
                 }
-                QGCLabel
+                FactTextField
                 {
+                    id:angleFactTextField
+                    fact: _planViewSettings.currentProfileAngle
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: true
+                    //active:false
+                    onEditingFinished: console.log(_planViewSettings.currentProfileAngle.rawValue)
+                }
+                QGCTextField
+                {
+                    id: angleQGCTextField
                     text: _planViewSettings.currentProfileAngle.rawValue
-
+                    visible: false
+                    onEditingFinished: console.log(angleQGCTextField.text)
                 }
                 QGCLabel
                 {
@@ -1137,11 +1170,28 @@ Item {
                 {
                 text: qsTr("Mission Speed:")
                 }
-                QGCLabel
+                FactTextField
+                {
+                    id:speedFactTextField
+                    fact: _planViewSettings.currentProfileSpeed
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: true
+                    //active:false
+                    onEditingFinished: console.log(_planViewSettings.currentProfileSpeed.rawValue)
+                }
+                QGCTextField
+                {
+                    id: speedQGCTextField
+                    text: _planViewSettings.currentProfileSpeed.rawValue
+                    visible: false
+                    onEditingFinished: console.log(speedQGCTextField.text)
+                }
+                /*QGCLabel
                 {
                     text: _planViewSettings.currentProfileSpeed.rawValue
 
-                }
+                }*/
                 QGCLabel
                 {
                 text: qsTr("Whinch profile:")
@@ -1221,22 +1271,10 @@ Item {
                 QGCLabel
                 {
                     text: qsTr("Select profile")
+                    visible: false
                 }
 
-                QGCComboBox
-                {
 
-                    id: scale
-                    Layout.fillWidth: true
-                    currentIndex: -1
-                    //text: _planViewSettings.currentProfileName.rawValue
-                    model: backend.profileList
-                    onActivated:
-                        {
-                            console.log(scale.currentText)
-                            backend.currentProfile=scale.currentText
-                        }
-                }
 
                 QGCButton {
                     id: testBut
@@ -1246,7 +1284,9 @@ Item {
                     onClicked: {
                         //testBut.text=scale.currentText
                         //console.log(backend.profile[0])
-                        dropPanel.hide()
+                        //dropPanel.hide()
+                        angleFactTextField.visible=false
+                        angleQGCTextField.visible=true
 
                     }
                 }

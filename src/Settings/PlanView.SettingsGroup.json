@@ -70,7 +70,7 @@
     "shortDesc":    "Profile Angle",
     "type":         "double",
     "default":      30.0,
-    "units":        "degree",
+    "units":        "º",
     "min":          15.0,
     "max":          45.0
 },
