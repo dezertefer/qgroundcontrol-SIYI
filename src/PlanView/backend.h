@@ -19,8 +19,8 @@ class BackEnd : public QObject
     Q_PROPERTY(double angle READ angle WRITE setAngle NOTIFY angleChanged)
     Q_PROPERTY(QString currentProfile  WRITE setCurrentProfile NOTIFY currentProfileChanged)
     Q_PROPERTY(QVariantMap profiles READ profiles  NOTIFY profilesChanged)
-    Q_PROPERTY(QVariantMap profile  READ profile WRITE setProfile NOTIFY profileChanged)
     Q_PROPERTY(QStringList profileList READ profileList NOTIFY profileListChanged)
+    Q_PROPERTY(QString editProfile WRITE editProfile NOTIFY editProfileChanged)
 
     QML_ELEMENT
 
@@ -33,6 +33,11 @@ public:
     QGeoCoordinate A();
     QGeoCoordinate B();
     QGeoCoordinate C();
+
+    void editProfile(const QString &profile);
+
+    void readJson();
+    void writeJson();
 
     void updateCurrentProfile(QString profile);
 
@@ -58,9 +63,7 @@ public:
     void setC(const QGeoCoordinate &newC);
 
     QVariantMap profiles();
-    QVariantMap profile();
 
-    void setProfile(const QVariantMap &newProfile);
 
 signals:
     void userNameChanged();
@@ -74,8 +77,9 @@ signals:
 
     void CChanged();
 
+    void editProfileChanged();
+
     void profilesChanged();
-    void profileChanged();
 
     void profileListChanged();
 

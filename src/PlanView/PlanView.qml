@@ -55,7 +55,9 @@ Item {
     property var    _appSettings:                       QGroundControl.settingsManager.appSettings
     property var    _planViewSettings:                  QGroundControl.settingsManager.planViewSettings
     property bool   _promptForPlanUsageShowing:         false
-    property real   _valueFieldWidth:                   ScreenTools.defaultFontPixelWidth * 7
+    property real   _valueFieldWidth:                   ScreenTools.defaultFontPixelWidth * 9
+    property bool   _isEdit:                            false
+    property bool   _isNew:                             false
 
     readonly property var       _layers:                [_layerMission, _layerGeoFence, _layerRallyPoints]
 
@@ -1088,6 +1090,16 @@ Item {
                 text:               qsTr("Current Profile "/*+_planViewSettings.currentProfileName.rawValue*/)
             }
 
+            QGCTextField
+            {
+            id: editTextField
+            text: qsTr(_planViewSettings.currentProfileName.rawValue)
+            Layout.fillWidth: true
+            visible: _isEdit
+            //height: ScreenTools.defaultFontPixelWidth * 10
+
+            }
+
             QGCComboBox
             {
 
@@ -1097,6 +1109,7 @@ Item {
                 //currentText: "Select Profile"
                 //text: _planViewSettings.currentProfileName.rawValue
                 model: backend.profileList
+                visible: !_isNew && !_isEdit
                 Component.onCompleted:
                 {
                     currentIndex = find(_planViewSettings.currentProfileName.rawValue)
@@ -1118,24 +1131,7 @@ Item {
                 columnSpacing:      ScreenTools.defaultFontPixelWidth
                 visible:            storageSection.visible
 
-                /*QGCButton {
-                    text:               qsTr("New...")
-                    Layout.fillWidth:   true
-                    onClicked:  {
-                        dropPanel.hide()
-                        if (_planMasterController.containsItems) {
-                            mainWindow.showComponentDialog(removeAllPromptDialog, qsTr("New Plan"), mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.No)
-                        }
-                    }
-                }*/
 
-
-              /*  QGCButton {
-                    text: backend.userName
-                    //placeholderText: qsTr("User name")
-                    Layout.fillWidth:   true
-                    onClicked: backend.userName = "hui"
-                }*/
                 QGCLabel
                 {
                 text: qsTr("Takeoff Angle:")
@@ -1146,25 +1142,25 @@ Item {
                     fact: _planViewSettings.currentProfileAngle
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
-                    visible: true
+                    visible: !_isNew
                     //active:false
+                    enabled: _isEdit
                     onEditingFinished: console.log(_planViewSettings.currentProfileAngle.rawValue)
-                }
-                QGCTextField
-                {
-                    id: angleQGCTextField
-                    text: _planViewSettings.currentProfileAngle.rawValue
-                    visible: false
-                    onEditingFinished: console.log(angleQGCTextField.text)
                 }
                 QGCLabel
                 {
                 text: qsTr("Mission Altitude:")
                 }
-                QGCLabel
+                FactTextField
                 {
-                    text: _planViewSettings.currentProfileAlt.rawValue
-
+                    id:altitudeFactTextField
+                    fact: _planViewSettings.currentProfileAlt
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: !_isNew
+                    //active:false
+                    enabled: _isEdit
+                    onEditingFinished: console.log(_planViewSettings.currentProfileAlt.rawValue)
                 }
                 QGCLabel
                 {
@@ -1176,30 +1172,27 @@ Item {
                     fact: _planViewSettings.currentProfileSpeed
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
-                    visible: true
+                    visible: !_isNew
                     //active:false
+                    enabled: _isEdit
                     onEditingFinished: console.log(_planViewSettings.currentProfileSpeed.rawValue)
                 }
-                QGCTextField
+                QGCLabel
                 {
-                    id: speedQGCTextField
-                    text: _planViewSettings.currentProfileSpeed.rawValue
-                    visible: false
-                    onEditingFinished: console.log(speedQGCTextField.text)
+                text: qsTr("Winch profile:")
                 }
-                /*QGCLabel
+                FactTextField
                 {
-                    text: _planViewSettings.currentProfileSpeed.rawValue
+                    id:winchFactTextField
+                    fact: _planViewSettings.currentProfileWinch
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: !_isNew
+                    //active:false
+                    enabled: _isEdit
+                    onEditingFinished: console.log(_planViewSettings.currentProfileWinch.rawValue)
+                }
 
-                }*/
-                QGCLabel
-                {
-                text: qsTr("Whinch profile:")
-                }
-                QGCLabel
-                {
-                    text: _planViewSettings.currentProfileWhinch.rawValue
-                }
 
 
                /* QGCButton {
@@ -1240,21 +1233,7 @@ Item {
                     }
                 }*/
 
-                /*QGCButton {
-                    Layout.columnSpan:  3
-                    Layout.fillWidth:   true
-                    text:               qsTr("Save Mission Waypoints As KML...")
-                    enabled:            !_planMasterController.syncInProgress && _visualItems.count > 1
-                    onClicked: {
-                        // First point does not count
-                        if (_visualItems.count < 2) {
-                            mainWindow.showComponentDialog(noItemForKML, qsTr("KML"), mainWindow.showDialogDefaultWidth, StandardButton.Cancel)
-                            return
-                        }
-                        dropPanel.hide()
-                        _planMasterController.saveKmlToSelectedFile()
-                    }
-                }*/
+
             }
 
 
@@ -1268,35 +1247,45 @@ Item {
                 Layout.fillWidth:   true
                 visible:            true//createSection.visible
 
-                QGCLabel
+                QGCButton
                 {
-                    text: qsTr("Select profile")
-                    visible: false
+                    text: qsTr("SAVE values")
+                    visible: _isEdit
+                    Layout.fillWidth:   true
+                    onClicked:
+                    {
+                        //backend.saveJson
+                        backend.editProfile = editTextField.text
+                        var copy = backend.profileList
+                        scale.model = copy
+                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                        _isEdit = false
+                    }
                 }
-
-
-
                 QGCButton {
                     id: testBut
                     text:               qsTr("New Profile")
-                    Layout.fillWidth:   true
-                    enabled:            true
+                    Layout.fillWidth:   true 
+                    enabled:            !_isEdit
                     onClicked: {
                         //testBut.text=scale.currentText
                         //console.log(backend.profile[0])
                         //dropPanel.hide()
-                        angleFactTextField.visible=false
-                        angleQGCTextField.visible=true
-
+                        //angleFactTextField.visible=false
+                        //angleQGCTextField.visible=true
+                        //_isNew = !_isNew
+                        //
                     }
                 }
                 QGCButton {
                     text:               qsTr("Edit Current Profile")
                     Layout.fillWidth:   true
                     enabled:            true
+                    visible: !_isEdit
                     onClicked: {
-
-                        dropPanel.hide()
+                        //scale.visible = false;
+                        _isEdit = true
+                        //dropPanel.hide()
 
                     }
                 }

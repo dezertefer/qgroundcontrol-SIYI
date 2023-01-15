@@ -14,52 +14,8 @@
 BackEnd::BackEnd(QObject *parent) :
     QObject(parent)
 {
+    readJson();
 
-    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
-    qDebug()<<file_path;
-
-    QFile file_obj(file_path);
-    if(!file_obj.open(QIODevice::ReadOnly)){
-        qDebug()<<"Failed to open "<<file_path;
-        exit(1);
-    }
-
-    QTextStream file_text(&file_obj);
-    QString json_string;
-    json_string = file_text.readAll();
-    file_obj.close();
-    QByteArray json_bytes = json_string.toLocal8Bit();
-
-    auto json_doc=QJsonDocument::fromJson(json_bytes);
-
-    if(json_doc.isNull()){
-        qDebug()<<"Failed to create JSON doc.";
-        exit(2);
-    }
-    if(!json_doc.isObject()){
-        qDebug()<<"JSON is not an object.";
-        exit(3);
-    }
-
-    QJsonObject json_obj=json_doc.object();
-
-
-    if(json_obj.isEmpty()){
-        qDebug()<<"JSON object is empty.";
-        exit(4);
-    }
-
-
-    QJsonObject root_obj = json_doc.object();
-    QVariantMap root_map = root_obj.toVariantMap();
-    m_root_map = root_map;
-
-
-    for(QVariantMap::const_iterator iter = root_map.begin(); iter != root_map.end(); ++iter)
-    {
-      //qDebug() << iter.key() ;
-      m_profileList.append(iter.key());
-    }
 }
 
 BackEnd::BackEnd(QString path)
@@ -202,24 +158,17 @@ QVariantMap BackEnd::profiles()
     return m_root_map;
 }
 
-QVariantMap BackEnd::profile()
-
-{
-
-    QVariantMap profile_map = m_root_map;
-    return profile_map;
-
-}
-
-void BackEnd::setProfile(const QVariantMap &newProfile)
-{
-    m_root_map = newProfile;
-}
-
 
 QStringList BackEnd::profileList()
 {
+    m_profileList.clear();
+    for(QVariantMap::const_iterator iter = m_root_map.begin(); iter != m_root_map.end(); ++iter)
+    {
+      //qDebug() << iter.key() ;
+      m_profileList.append(iter.key());
+    }
     return m_profileList;
+    emit profileListChanged();
 }
 
 
@@ -239,5 +188,124 @@ void BackEnd::updateCurrentProfile (QString profile)
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->setRawValue(m_selectedProfile["alt"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->setRawValue(m_selectedProfile["speed"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->setRawValue(m_selectedProfile["angle"].toDouble());
-    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWhinch()->setRawValue(m_selectedProfile["whinch"].toString());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->setRawValue(m_selectedProfile["winch"].toString());
+}
+
+void BackEnd::readJson ()
+{
+    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
+    qDebug()<<file_path;
+
+    QFile file_obj(file_path);
+    if(!file_obj.open(QIODevice::ReadOnly)){
+        qDebug()<<"Failed to open "<<file_path;
+
+        QJsonObject profilesList;
+        QJsonObject defaultProfile;
+
+        defaultProfile.insert("name",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawDefaultValue().toString());
+        defaultProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawDefaultValue().toString());
+        defaultProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawDefaultValue().toString());
+        defaultProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawDefaultValue().toString());
+        defaultProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->rawDefaultValue().toString());
+
+        profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawDefaultValue().toString(),defaultProfile);
+        QJsonDocument doc (profilesList);
+        QFile profiles(file_path);
+        profiles.open(QIODevice::WriteOnly);
+        profiles.write(doc.toJson());
+        profiles.close();
+    }
+    file_obj.close();
+    QFile file_obj1(file_path);
+    if(!file_obj1.open(QIODevice::ReadOnly))
+    {
+        qDebug()<<"Failed to open "<<file_path;
+        exit(505);
+    }
+
+    QTextStream file_text(&file_obj1);
+    QString json_string;
+    json_string = file_text.readAll();
+    file_obj1.close();
+    QByteArray json_bytes = json_string.toLocal8Bit();
+
+    auto json_doc=QJsonDocument::fromJson(json_bytes);
+
+    if(json_doc.isNull()){
+        qDebug()<<"Failed to create JSON doc.";
+        exit(2);
+    }
+    if(!json_doc.isObject()){
+        qDebug()<<"JSON is not an object.";
+        exit(3);
+    }
+
+    QJsonObject json_obj=json_doc.object();
+
+
+    if(json_obj.isEmpty()){
+        qDebug()<<"JSON object is empty.";
+        exit(4);
+    }
+
+
+    QJsonObject root_obj = json_doc.object();
+    QVariantMap root_map = root_obj.toVariantMap();
+    m_root_map = root_map;
+
+
+
+
+
+
+}
+
+void BackEnd::editProfile (const QString &profile)
+{
+
+   QString initialName = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawValue().toString();
+   QVariantMap swap;
+
+   QJsonObject profilesList;
+   QJsonObject currentProfile;
+
+   for(QVariantMap::const_iterator iter = m_root_map.begin(); iter != m_root_map.end(); ++iter)
+    {
+       if (iter.key() != initialName)
+       {
+           swap.insert(iter.key(),iter.value());
+       }
+    }
+
+   profilesList = QJsonObject::fromVariantMap(swap);
+
+
+   currentProfile.insert("name", profile);
+   currentProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toString());
+   currentProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toString());
+   currentProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toString());
+   currentProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->rawValue().toString());
+
+   profilesList.insert(profile,currentProfile);
+
+   m_root_map = profilesList.toVariantMap();
+   qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->setRawValue(profile);
+
+
+   //qDebug()<< profilesList;
+
+   QJsonDocument doc = QJsonDocument::fromVariant(m_root_map);
+   QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
+
+   QFile profiles(file_path);
+   profiles.open(QIODevice::WriteOnly);
+   profiles.write(doc.toJson());
+   profiles.close();
+
+}
+
+void BackEnd::writeJson()
+{
+
 }

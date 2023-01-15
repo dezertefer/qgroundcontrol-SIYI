@@ -30,7 +30,7 @@ public:
     DEFINE_SETTINGFACT(currentProfileAlt)
     DEFINE_SETTINGFACT(currentProfileSpeed)
     DEFINE_SETTINGFACT(currentProfileAngle)
-    DEFINE_SETTINGFACT(currentProfileWhinch)
+    DEFINE_SETTINGFACT(currentProfileWinch)
 
 
 
