@@ -79,6 +79,45 @@
     "shortDesc":    "Profile Winch",
     "type":         "string",
     "default":      "TODO"
+},
+{
+    "name":         "newProfileName",
+    "shortDesc":    "Profile name",
+    "type":         "string",
+    "default":      "default"
+},
+{
+    "name":         "newProfileAlt",
+    "shortDesc":    "Profile Altitude",
+    "type":         "double",
+    "default":      20.0,
+    "units":        "m",
+    "min":          5.0,
+    "max":          60.0
+},
+{
+    "name":         "newProfileSpeed",
+    "shortDesc":    "Profile Speed",
+    "type":         "double",
+    "default":      5.0,
+    "units":        "m/s",
+    "min":          2.0,
+    "max":          12.0
+},
+{
+    "name":         "newProfileAngle",
+    "shortDesc":    "Profile Angle",
+    "type":         "double",
+    "default":      30.0,
+    "units":        "º",
+    "min":          15.0,
+    "max":          45.0
+},
+{
+    "name":         "newProfileWinch",
+    "shortDesc":    "Profile Winch",
+    "type":         "string",
+    "default":      "TODO"
 }
 ]
 }

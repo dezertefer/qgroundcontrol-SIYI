@@ -294,18 +294,52 @@ void BackEnd::editProfile (const QString &profile)
 
 
    //qDebug()<< profilesList;
+    writeJson(m_root_map);
 
-   QJsonDocument doc = QJsonDocument::fromVariant(m_root_map);
+   /*QJsonDocument doc = QJsonDocument::fromVariant(m_root_map);
    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
 
    QFile profiles(file_path);
    profiles.open(QIODevice::WriteOnly);
    profiles.write(doc.toJson());
    profiles.close();
+*/
+}
+
+void BackEnd::setNewProfile(const QString &profile)
+{
+    //QJsonObject profilesList;
+    QJsonObject newProfile;
+
+    newProfile.insert("name",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString());
+    newProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAngle()->rawValue().toString());
+    newProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAlt()->rawValue().toString());
+    newProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue().toString());
+    newProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileWinch()->rawValue().toString());
+
+    //profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(),newProfile);
+    m_root_map.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(), newProfile);
+
+    writeJson(m_root_map);
+    setCurrentProfile(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString());
+    /*
+    QJsonDocument doc = QJsonDocument::fromVariant(m_root_map);
+    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
+
+    QFile profiles(file_path);
+    profiles.open(QIODevice::WriteOnly);
+    profiles.write(doc.toJson());
+    profiles.close();*/
 
 }
 
-void BackEnd::writeJson()
+void BackEnd::writeJson(QVariantMap map)
 {
+    QJsonDocument doc = QJsonDocument::fromVariant(map);
+    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/Profiles.json";
 
+    QFile profiles(file_path);
+    profiles.open(QIODevice::WriteOnly);
+    profiles.write(doc.toJson());
+    profiles.close();
 }

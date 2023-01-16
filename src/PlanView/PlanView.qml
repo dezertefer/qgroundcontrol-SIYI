@@ -1122,6 +1122,14 @@ Item {
                     }
             }
 
+            FactTextField
+            {
+            id: newTextField
+            Layout.fillWidth: true
+            fact: _planViewSettings.newProfileName
+            visible: _isNew
+            }
+
 
 
 
@@ -1143,10 +1151,19 @@ Item {
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
                     visible: !_isNew
-                    //active:false
                     enabled: _isEdit
-                    onEditingFinished: console.log(_planViewSettings.currentProfileAngle.rawValue)
                 }
+
+                FactTextField
+                {
+                    id:newAngleFactTextField
+                    fact: _planViewSettings.newProfileAngle
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
+                }
+
+
                 QGCLabel
                 {
                 text: qsTr("Mission Altitude:")
@@ -1158,10 +1175,17 @@ Item {
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
                     visible: !_isNew
-                    //active:false
                     enabled: _isEdit
-                    onEditingFinished: console.log(_planViewSettings.currentProfileAlt.rawValue)
                 }
+                FactTextField
+                {
+                    id:newAltitudeFactTextField
+                    fact: _planViewSettings.newProfileAlt
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
+                }
+
                 QGCLabel
                 {
                 text: qsTr("Mission Speed:")
@@ -1173,10 +1197,18 @@ Item {
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
                     visible: !_isNew
-                    //active:false
                     enabled: _isEdit
-                    onEditingFinished: console.log(_planViewSettings.currentProfileSpeed.rawValue)
                 }
+
+                FactTextField
+                {
+                    id:newSpeedFactTextField
+                    fact: _planViewSettings.newProfileSpeed
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
+                }
+
                 QGCLabel
                 {
                 text: qsTr("Winch profile:")
@@ -1188,9 +1220,15 @@ Item {
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
                     visible: !_isNew
-                    //active:false
                     enabled: _isEdit
-                    onEditingFinished: console.log(_planViewSettings.currentProfileWinch.rawValue)
+                }
+                FactTextField
+                {
+                    id:newWinchFactTextField
+                    fact: _planViewSettings.newProfileWinch
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
                 }
 
 
@@ -1262,12 +1300,29 @@ Item {
                         _isEdit = false
                     }
                 }
+
+                QGCButton
+                {
+                    text: qsTr("ADD profile")
+                    visible: _isNew
+                    Layout.fillWidth:   true
+                    onClicked:
+                    {
+                        backend.newProfile = newTextField.text
+                        var copy = backend.profileList
+                        scale.model = copy
+                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                        _isNew = false
+                    }
+                }
+
                 QGCButton {
                     id: testBut
                     text:               qsTr("New Profile")
                     Layout.fillWidth:   true 
-                    enabled:            !_isEdit
+                    visible:            !_isEdit && !_isNew
                     onClicked: {
+                        _isNew = true
                         //testBut.text=scale.currentText
                         //console.log(backend.profile[0])
                         //dropPanel.hide()
@@ -1280,8 +1335,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Edit Current Profile")
                     Layout.fillWidth:   true
-                    enabled:            true
-                    visible: !_isEdit
+                    visible:            !_isNew && !_isEdit
                     onClicked: {
                         //scale.visible = false;
                         _isEdit = true
@@ -1292,7 +1346,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Delete profile")
                     Layout.fillWidth:   true
-                    enabled:            true
+                    visible:            !_isNew && !_isEdit
                     onClicked: {
                         dropPanel.hide()
 
