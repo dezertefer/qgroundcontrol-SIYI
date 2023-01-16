@@ -58,6 +58,7 @@ Item {
     property real   _valueFieldWidth:                   ScreenTools.defaultFontPixelWidth * 9
     property bool   _isEdit:                            false
     property bool   _isNew:                             false
+    property bool   _isDel:                             false
 
     readonly property var       _layers:                [_layerMission, _layerGeoFence, _layerRallyPoints]
 
@@ -1076,6 +1077,7 @@ Item {
                 id:                 unsavedChangedLabel
                 //Layout.fillWidth:   true
                 wrapMode:           Text.WordWrap
+                Layout.preferredWidth: _valueFieldWidth*2
                 text:               globals.activeVehicle ?
                                         qsTr("You have unsaved changes. You should upload to your vehicle, or save to a file.") :
                                         qsTr("You have unsaved changes.")
@@ -1320,7 +1322,7 @@ Item {
                     id: testBut
                     text:               qsTr("New Profile")
                     Layout.fillWidth:   true 
-                    visible:            !_isEdit && !_isNew
+                    visible:            !_isNew && !_isEdit && !_isDel
                     onClicked: {
                         _isNew = true
                         //testBut.text=scale.currentText
@@ -1335,7 +1337,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Edit Current Profile")
                     Layout.fillWidth:   true
-                    visible:            !_isNew && !_isEdit
+                    visible:            !_isNew && !_isEdit && !_isDel
                     onClicked: {
                         //scale.visible = false;
                         _isEdit = true
@@ -1346,12 +1348,44 @@ Item {
                 QGCButton {
                     text:               qsTr("Delete profile")
                     Layout.fillWidth:   true
-                    visible:            !_isNew && !_isEdit
-                    onClicked: {
-                        dropPanel.hide()
+                    visible:            !_isNew && !_isEdit && !_isDel
+                    onClicked:
+                    {
+                        _isDel = true
 
                     }
                 }
+                QGCLabel
+                {
+                text: qsTr("Do you want to remove current profile?")
+                Layout.preferredWidth: _valueFieldWidth*2
+                visible: _isDel
+                wrapMode: Label.WordWrap
+                }
+                QGCButton
+                {
+                    text: qsTr("YES")
+                    visible: _isDel
+                    onClicked:
+                    {
+                        backend.deleteProfile = _planViewSettings.currentProfileName.rawValue
+                        var copy = backend.profileList
+                        scale.model = copy
+                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                        _isDel = false
+                    }
+
+                }
+                QGCButton
+                {
+                    text: qsTr("NO")
+                    visible: _isDel
+                    onClicked:
+                    {
+                    _isDel = false
+                    }
+                }
+
             }
 
 

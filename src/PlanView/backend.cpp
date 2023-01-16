@@ -333,6 +333,24 @@ void BackEnd::setNewProfile(const QString &profile)
 
 }
 
+void BackEnd::deleteProfile(const QString &profile)
+{
+    QVariantMap swap;
+
+    for(QVariantMap::const_iterator iter = m_root_map.begin(); iter != m_root_map.end(); ++iter)
+     {
+        if (iter.key() != profile)
+        {
+            swap.insert(iter.key(),iter.value());
+        }
+     }
+
+    m_root_map = swap;
+    setCurrentProfile(m_root_map.begin().key());
+    writeJson(m_root_map);
+
+}
+
 void BackEnd::writeJson(QVariantMap map)
 {
     QJsonDocument doc = QJsonDocument::fromVariant(map);
