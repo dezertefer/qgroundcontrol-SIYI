@@ -66,6 +66,9 @@ Item {
     property string _batteryChangePointText:    _batteryChangePoint < 0 ?       qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText:     _batteriesRequired < 0 ?        qsTr("N/A") : _batteriesRequired
 
+    property real   _KEK :                      QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_missionMaxTelemetry).toFixed(2)
+
+
     readonly property real _margins: ScreenTools.defaultFontPixelWidth
 
     function getMissionTime() {
@@ -138,47 +141,68 @@ Item {
                 text:               qsTr("Selected Waypoint")
                 Layout.columnSpan:  8
                 font.pointSize:     ScreenTools.smallFontPointSize
+                visible:            false
             }
 
-            QGCLabel { text: qsTr("Alt diff:"); font.pointSize: _dataFontSize; }
+            QGCLabel {
+                text: qsTr("Alt diff:"); font.pointSize: _dataFontSize;
+                visible:            false
+            }
             QGCLabel {
                 text:                   _altDifferenceText
                 font.pointSize:         _dataFontSize
                 Layout.minimumWidth:    _mediumValueWidth
+                visible:            false
             }
 
-            Item { width: 1; height: 1 }
+            //Item { width: 1; height: 1 }
 
-            QGCLabel { text: qsTr("Azimuth:"); font.pointSize: _dataFontSize; }
+            QGCLabel {
+                text: qsTr("Azimuth:"); font.pointSize: _dataFontSize;
+                visible:            false
+            }
             QGCLabel {
                 text:                   _azimuthText
                 font.pointSize:         _dataFontSize
                 Layout.minimumWidth:    _smallValueWidth
+                visible:            false
             }
 
-            Item { width: 1; height: 1 }
+            //Item { width: 1; height: 1 }
 
-            QGCLabel { text: qsTr("Distance:"); font.pointSize: _dataFontSize; }
+            QGCLabel {
+                text: qsTr("Distance:"); font.pointSize: _dataFontSize;
+                visible:            false
+            }
             QGCLabel {
                 text:                   _distanceText
                 font.pointSize:         _dataFontSize
                 Layout.minimumWidth:    _largeValueWidth
+                visible:            false
             }
 
-            QGCLabel { text: qsTr("Gradient:"); font.pointSize: _dataFontSize; }
+            QGCLabel {
+                text: qsTr("Gradient:"); font.pointSize: _dataFontSize;
+                visible:            false
+            }
             QGCLabel {
                 text:                   _gradientText
                 font.pointSize:         _dataFontSize
                 Layout.minimumWidth:    _mediumValueWidth
+                visible:            false
             }
 
-            Item { width: 1; height: 1 }
+            //Item { width: 1; height: 1 }
 
-            QGCLabel { text: qsTr("Heading:"); font.pointSize: _dataFontSize; }
+            QGCLabel {
+                text: qsTr("Heading:"); font.pointSize: _dataFontSize;
+                visible:            false
+            }
             QGCLabel {
                 text:                   _headingText
                 font.pointSize:         _dataFontSize
                 Layout.minimumWidth:    _smallValueWidth
+                visible:            false
             }
         }
 
@@ -242,14 +266,26 @@ Item {
         }
 
         QGCButton {
+
             id:          uploadButton
             text:        _controllerDirty ? qsTr("Upload Required") : qsTr("Upload")
-            enabled:     !_controllerSyncInProgress
+            enabled:     _KEK<1500 && !_controllerSyncInProgress
             visible:     !_controllerOffline && !_controllerSyncInProgress && !uploadCompleteText.visible
             primary:     _controllerDirty
-            onClicked:   _planMasterController.upload()
+
+
+            onClicked:
+            {
+//                if(_KEK>1500.0)
+//                {
+//                    console.log("KEKEKEKEKEKE")
+//                }
+                _planMasterController.upload()
+                //console.log(_uploadAllowed)
+            }
 
             PropertyAnimation on opacity {
+                //onStarted: 123
                 easing.type:    Easing.OutQuart
                 from:           0.5
                 to:             1
@@ -258,6 +294,12 @@ Item {
                 alwaysRunToEnd: true
                 duration:       2000
             }
+        }
+
+        QGCLabel
+        {
+            text: _KEK<1500 ? "" : " Drop point is too far!"
+            color: "red"
         }
     }
 

@@ -188,7 +188,7 @@ void BackEnd::updateCurrentProfile (QString profile)
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->setRawValue(m_selectedProfile["alt"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->setRawValue(m_selectedProfile["speed"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->setRawValue(m_selectedProfile["angle"].toDouble());
-    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->setRawValue(m_selectedProfile["winch"].toString());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->setRawValue(m_selectedProfile["takeOffSpeed"].toString());
 }
 
 void BackEnd::readJson ()
@@ -207,9 +207,52 @@ void BackEnd::readJson ()
         defaultProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawDefaultValue().toString());
         defaultProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawDefaultValue().toString());
         defaultProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawDefaultValue().toString());
-        defaultProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->rawDefaultValue().toString());
+        defaultProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawDefaultValue().toString());
 
         profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawDefaultValue().toString(),defaultProfile);
+
+        defaultProfile = QJsonObject();
+
+        defaultProfile.insert("name","Rapid Launcher");
+        defaultProfile.insert("angle","45");
+        defaultProfile.insert("alt","50");
+        defaultProfile.insert("speed","6.9");
+        defaultProfile.insert("takeOffSpeed","1.11");
+
+        profilesList.insert("Rapid Launcher", defaultProfile);
+
+        defaultProfile = QJsonObject();
+
+        defaultProfile.insert("name","Winch");
+        defaultProfile.insert("angle","45");
+        defaultProfile.insert("alt","60");
+        defaultProfile.insert("speed","5.55");
+        defaultProfile.insert("takeOffSpeed","1.11");
+
+        profilesList.insert("Winch", defaultProfile);
+
+        defaultProfile = QJsonObject();
+
+        defaultProfile.insert("name","Direct off sand");
+        defaultProfile.insert("angle","30");
+        defaultProfile.insert("alt","60");
+        defaultProfile.insert("speed","6.9");
+        defaultProfile.insert("takeOffSpeed","1.67");
+
+        profilesList.insert("Direct off sand", defaultProfile);
+
+        defaultProfile = QJsonObject();
+
+        defaultProfile.insert("name","Winch clipping traces");
+        defaultProfile.insert("angle","45");
+        defaultProfile.insert("alt","60");
+        defaultProfile.insert("speed","5.55");
+        defaultProfile.insert("takeOffSpeed","0.83");
+
+        profilesList.insert("Winch clipping traces", defaultProfile);
+
+
+
         QJsonDocument doc (profilesList);
         QFile profiles(file_path);
         profiles.open(QIODevice::WriteOnly);
@@ -285,7 +328,7 @@ void BackEnd::editProfile (const QString &profile)
    currentProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toString());
    currentProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toString());
    currentProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toString());
-   currentProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinch()->rawValue().toString());
+   currentProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toString());
 
    profilesList.insert(profile,currentProfile);
 
@@ -315,7 +358,7 @@ void BackEnd::setNewProfile(const QString &profile)
     newProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAngle()->rawValue().toString());
     newProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAlt()->rawValue().toString());
     newProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue().toString());
-    newProfile.insert("winch",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileWinch()->rawValue().toString());
+    newProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileTakeOffSpeed()->rawValue().toString());
 
     //profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(),newProfile);
     m_root_map.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(), newProfile);

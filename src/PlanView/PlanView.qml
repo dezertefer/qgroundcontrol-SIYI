@@ -34,6 +34,8 @@ Item {
 
     property bool planControlColapsed: false
 
+    property bool dropPointSelected: false
+
     readonly property int   _decimalPlaces:             8
     readonly property real  _margin:                    ScreenTools.defaultFontPixelHeight * 0.5
     readonly property real  _toolsMargin:               ScreenTools.defaultFontPixelWidth * 0.75
@@ -328,6 +330,8 @@ Item {
 
     function insertSimpleItemAfterCurrent(coordinate) {
         //transfer mapCenter() and click coordinate to cpp class
+        if (!dropPointSelected)
+        {
         var vehicleCoordinate = globals.activeVehicle.coordinate
         backend.A = vehicleCoordinate
 
@@ -344,6 +348,7 @@ Item {
 
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
 
+
         nextIndex += 1
 
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
@@ -354,7 +359,10 @@ Item {
 
         nextIndex += 1
 
-        _missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
+        _missionController.insertLandItem(vehicleCoordinate, nextIndex, true)
+        //_missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
+        dropPointSelected = true
+        }
 
     }
 
@@ -497,7 +505,7 @@ Item {
                     coordinate.latitude = coordinate.latitude.toFixed(_decimalPlaces)
                     coordinate.longitude = coordinate.longitude.toFixed(_decimalPlaces)
                     coordinate.altitude = coordinate.altitude.toFixed(_decimalPlaces)
-
+                    //console.log("ssssss")
                     switch (_editingLayer) {
                     case _layerMission:
                         if (addWaypointRallyPointAction.checked) {
@@ -786,9 +794,9 @@ Item {
         Item {
             anchors.fill:           rightPanel
             anchors.topMargin:      _toolsMargin
-            DeadMouseArea {
+            /*DeadMouseArea {
                 anchors.fill:   parent
-            }
+            }*/
             Column {
                 id:                 rightControls
                 spacing:            ScreenTools.defaultFontPixelHeight * 0.5
@@ -856,7 +864,7 @@ Item {
                 QGCTabBar {
                     id:         layerTabBar
                     width:      parent.width
-                    visible:    (!planControlColapsed || !_airspaceEnabled) && QGroundControl.corePlugin.options.enablePlanViewSelector
+                    visible:    false//(!planControlColapsed || !_airspaceEnabled) && QGroundControl.corePlugin.options.enablePlanViewSelector
                     Component.onCompleted: currentIndex = 0
                     QGCTabButton {
                         text:       qsTr("Mission")
@@ -875,13 +883,14 @@ Item {
             // Mission Item Editor
             Item {
                 id:                     missionItemEditor
-                anchors.left:           parent.left
+                //anchors.left:           parent.left
+                width: 1
                 anchors.right:          parent.right
                 anchors.top:            rightControls.bottom
                 anchors.topMargin:      ScreenTools.defaultFontPixelHeight * 0.25
                 anchors.bottom:         parent.bottom
                 anchors.bottomMargin:   ScreenTools.defaultFontPixelHeight * 0.25
-                visible:                _editingLayer == _layerMission && !planControlColapsed
+                visible:                false//_editingLayer == _layerMission && !planControlColapsed
                 QGCListView {
                     id:                 missionItemEditorListView
                     anchors.fill:       parent
@@ -1165,10 +1174,32 @@ Item {
                     visible: _isNew
                 }
 
+                QGCLabel
+                {
+                text: qsTr("Takeoff speed:")
+                }
+                FactTextField
+                {
+                    id:winchFactTextField
+                    fact: _planViewSettings.currentProfileTakeOffSpeed
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: !_isNew
+                    enabled: _isEdit
+                }
+                FactTextField
+                {
+                    id:newWinchFactTextField
+                    fact: _planViewSettings.newProfileTakeOffSpeed
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
+                }
+
 
                 QGCLabel
                 {
-                text: qsTr("Mission Altitude:")
+                text: qsTr("Haul Altitude:")
                 }
                 FactTextField
                 {
@@ -1190,7 +1221,7 @@ Item {
 
                 QGCLabel
                 {
-                text: qsTr("Mission Speed:")
+                text: qsTr("Haul Speed:")
                 }
                 FactTextField
                 {
@@ -1211,27 +1242,7 @@ Item {
                     visible: _isNew
                 }
 
-                QGCLabel
-                {
-                text: qsTr("Winch profile:")
-                }
-                FactTextField
-                {
-                    id:winchFactTextField
-                    fact: _planViewSettings.currentProfileWinch
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-                FactTextField
-                {
-                    id:newWinchFactTextField
-                    fact: _planViewSettings.newProfileWinch
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                }
+
 
 
 
@@ -1444,6 +1455,7 @@ Item {
                     onClicked: {
                         dropPanel.hide()
                         mainWindow.showComponentDialog(clearVehicleMissionDialog, text, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
+                        dropPointSelected = false
                     }
                 }
             }

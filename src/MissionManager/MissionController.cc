@@ -317,6 +317,12 @@ VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordin
     newItem->setSequenceNumber(sequenceNumber);
     newItem->setCoordinate(coordinate);
     newItem->setCommand(command);
+
+    if (visualItemIndex == 2)
+    {
+        newItem->speedSection()->setSpecifyFlightSpeed(true);
+        newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble());
+    }
     _initVisualItem(newItem);
 
     if (newItem->specifiesAltitude()) {
@@ -329,6 +335,7 @@ VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordin
                 if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
                     // We are in mixed altitude modes, so copy from previous. Otherwise alt mode will be set from global setting.
                     newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
+
                 }
             }
         }

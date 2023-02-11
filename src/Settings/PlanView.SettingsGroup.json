@@ -75,10 +75,13 @@
     "max":          45.0
 },
 {
-    "name":         "currentProfileWinch",
-    "shortDesc":    "Profile Winch",
-    "type":         "string",
-    "default":      "TODO"
+    "name":         "currentProfileTakeOffSpeed",
+    "shortDesc":    "Profile takeoff Speed",
+    "type":         "double",
+    "default":      5.0,
+    "units":        "m/s",
+    "min":          2.0,
+    "max":          12.0
 },
 {
     "name":         "newProfileName",
@@ -114,10 +117,13 @@
     "max":          45.0
 },
 {
-    "name":         "newProfileWinch",
-    "shortDesc":    "Profile Winch",
-    "type":         "string",
-    "default":      "TODO"
+    "name":         "newProfileTakeOffSpeed",
+    "shortDesc":    "Profile takeoff Speed",
+    "type":         "double",
+    "default":      5.0,
+    "units":        "m/s",
+    "min":          2.0,
+    "max":          12.0
 }
 ]
 }

@@ -85,6 +85,7 @@ Rectangle {
                 if (!_dragStartSignalled) {
                     _dragStartSignalled = true
                     dragStart()
+                    console.log("kek")
                 }
             } else {
                 _dragStartSignalled = false
