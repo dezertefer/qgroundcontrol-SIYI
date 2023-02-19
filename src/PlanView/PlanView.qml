@@ -323,14 +323,14 @@ Item {
         }
     }
 
-    BackEnd {
+    /*BackEnd {
            id: backend
-       }
+       }*/
 
 
     function insertSimpleItemAfterCurrent(coordinate) {
         //transfer mapCenter() and click coordinate to cpp class
-
+        console.log(backend.dropPointSelected)
         if (!backend.dropPointSelected)
         {
         var vehicleCoordinate = globals.activeVehicle.coordinate
@@ -589,7 +589,7 @@ Item {
                 anchorPoint.x:  sourceItem.width / 2
                 anchorPoint.y:  sourceItem.height / 2
                 z:              QGroundControl.zOrderWaypointLines + 1
-                visible:        _editingLayer == _layerMission
+                visible:        false// _editingLayer == _layerMission
 
                 sourceItem: SplitIndicator {
                     onClicked:  _missionController.insertSimpleMissionItem(splitSegmentItem.coordinate,
@@ -921,7 +921,7 @@ Item {
                         map:            editorMap
                         masterController:  _planMasterController
                         missionItem:    object
-                        width:          parent.width
+                        width:          1//parent.width
                         readOnly:       false
                         onClicked:      _missionController.setCurrentPlanViewSeqNum(object.sequenceNumber, false)
                         onRemove: {
@@ -974,11 +974,11 @@ Item {
             anchors.margins:    _toolsMargin
             anchors.leftMargin: 0
             anchors.left:       mapScale.left
-            anchors.right:      parrent.right
-            anchors.bottom:     parent.bottom
+            //anchors.right:      parrent.right
+            //anchors.bottom:     parent.bottom
             height:             ScreenTools.defaultFontPixelHeight * 7
             missionController:  _missionController
-            visible:            _internalVisible && _editingLayer === _layerMission && QGroundControl.corePlugin.options.showMissionStatus
+            visible:            false//_internalVisible && _editingLayer === _layerMission && QGroundControl.corePlugin.options.showMissionStatus
 
             onSetCurrentSeqNum: _missionController.setCurrentPlanViewSeqNum(seqNum, true)
 

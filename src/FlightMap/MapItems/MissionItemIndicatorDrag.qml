@@ -13,7 +13,7 @@ import QtLocation   5.3
 import QGroundControl               1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.Controls      1.0
-import io.qt.examples.backend           1.0
+
 import QGroundControl.Controllers       1.0
 import QGroundControl.FactSystem        1.0
 
@@ -59,9 +59,9 @@ Rectangle {
 
 
 
-    BackEnd {
-    id: backend
-    }
+//    BackEnd {
+//    id: backend
+//    }
 
     function liveDrag() {
         if (!itemDragger._preventCoordinateBindingLoop && itemDrag.drag.active) {

@@ -19,6 +19,7 @@ import QGroundControl.Controls      1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.FlightDisplay 1.0
 import QGroundControl.FlightMap     1.0
+import io.qt.examples.backend           1.0
 
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
@@ -86,6 +87,10 @@ ApplicationWindow {
 
         property var                planMasterControllerPlanView:   null
         property var                currentPlanMissionItem:         planMasterControllerPlanView ? planMasterControllerPlanView.missionController.currentPlanViewItem : null
+    }
+
+    BackEnd {
+        id: backend
     }
 
     /// Default color palette used throughout the UI

@@ -55,9 +55,9 @@ Item {
         }
     }
 
-    BackEnd {
+    /*BackEnd {
            id: backend
-       }
+       }*/
     Component {
         id: missionCompleteDialogComponent
 
