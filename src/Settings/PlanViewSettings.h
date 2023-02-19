@@ -36,6 +36,7 @@ public:
     DEFINE_SETTINGFACT(newProfileSpeed)
     DEFINE_SETTINGFACT(newProfileAngle)
     DEFINE_SETTINGFACT(newProfileTakeOffSpeed)
+    DEFINE_SETTINGFACT(dropPointSelected)
 
 
 

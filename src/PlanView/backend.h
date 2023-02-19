@@ -23,12 +23,15 @@ class BackEnd : public QObject
     Q_PROPERTY(QVariantMap profiles READ profiles  NOTIFY profilesChanged)
     Q_PROPERTY(QStringList profileList READ profileList NOTIFY profileListChanged)
     Q_PROPERTY(QString editProfile WRITE editProfile NOTIFY editProfileChanged)
+    Q_PROPERTY(bool dropPointSelected READ dropPointSelected WRITE setDropPointSelected NOTIFY dropPointSelectedChanged)
 
     QML_ELEMENT
 
 public:
     explicit BackEnd(QObject *parent = nullptr);
     BackEnd(QString path);
+    bool dropPointSelected();
+    void setDropPointSelected(bool &dropPoint);
 
     QString userName();
     void CreateJson();
@@ -87,6 +90,8 @@ signals:
 
     void profileListChanged();
 
+    void dropPointSelectedChanged();
+
 private:
     QString m_userName;
     QGeoCoordinate m_A;
@@ -95,7 +100,7 @@ private:
     QList<QString> list;
     double m_angle;
 
-
+    bool m_dropPointSelected = false;
 
     qreal m_direction;
 

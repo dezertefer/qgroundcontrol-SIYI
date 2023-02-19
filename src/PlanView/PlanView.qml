@@ -34,7 +34,7 @@ Item {
 
     property bool planControlColapsed: false
 
-    property bool dropPointSelected: false
+    property bool dropPointSelected: QGroundControl.settingsManager.planViewSettings.dropPointSelected.rawValue
 
     readonly property int   _decimalPlaces:             8
     readonly property real  _margin:                    ScreenTools.defaultFontPixelHeight * 0.5
@@ -330,7 +330,8 @@ Item {
 
     function insertSimpleItemAfterCurrent(coordinate) {
         //transfer mapCenter() and click coordinate to cpp class
-        if (!dropPointSelected)
+
+        if (!backend.dropPointSelected)
         {
         var vehicleCoordinate = globals.activeVehicle.coordinate
         backend.A = vehicleCoordinate
@@ -348,8 +349,12 @@ Item {
 
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
 
+        //globals.activeVehicle.homePosition
 
-        nextIndex += 1
+
+        console.log(nextIndex)
+
+        nextIndex = _missionController.currentPlanViewVIIndex + 1
 
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
 
@@ -361,7 +366,9 @@ Item {
 
         _missionController.insertLandItem(vehicleCoordinate, nextIndex, true)
         //_missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
-        dropPointSelected = true
+        //dropPointSelected = true
+       // QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(true)
+            backend.dropPointSelected = true
         }
 
     }
@@ -1455,7 +1462,9 @@ Item {
                     onClicked: {
                         dropPanel.hide()
                         mainWindow.showComponentDialog(clearVehicleMissionDialog, text, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                        dropPointSelected = false
+                        //QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(false)
+                        //dropPointSelected = false
+                        backend.dropPointSelected = false
                     }
                 }
             }

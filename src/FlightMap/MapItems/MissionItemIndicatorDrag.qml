@@ -13,6 +13,11 @@ import QtLocation   5.3
 import QGroundControl               1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.Controls      1.0
+import io.qt.examples.backend           1.0
+import QGroundControl.Controllers       1.0
+import QGroundControl.FactSystem        1.0
+
+
 
 /// Use to drag a MissionItemIndicator
 Rectangle {
@@ -23,6 +28,9 @@ Rectangle {
     height:         _itemIndicatorHeight + (_touchMarginVertical * 2)
     color:          "transparent"
     z:              QGroundControl.zOrderMapItems + 1    // Above item icons
+
+
+    property var    _missionController:                 _planMasterController.missionController
 
     // Properties which must be specific by consumer
     property var mapControl     ///< Map control which contains this item
@@ -49,11 +57,17 @@ Rectangle {
     onXChanged: liveDrag()
     onYChanged: liveDrag()
 
+
+
+    BackEnd {
+    id: backend
+    }
     function liveDrag() {
         if (!itemDragger._preventCoordinateBindingLoop && itemDrag.drag.active) {
             var point = Qt.point(itemDragger.x + _touchMarginHorizontal + itemIndicator.anchorPoint.x, itemDragger.y + _touchMarginVertical + itemIndicator.anchorPoint.y)
             var coordinate = mapControl.toCoordinate(point, false /* clipToViewPort */)
             itemDragger._preventCoordinateBindingLoop = true
+            //console.log(itemCoordinate.altitude)
             coordinate.altitude = itemCoordinate.altitude
             itemCoordinate = coordinate
             itemDragger._preventCoordinateBindingLoop = false
@@ -85,11 +99,25 @@ Rectangle {
                 if (!_dragStartSignalled) {
                     _dragStartSignalled = true
                     dragStart()
-                    console.log("kek")
+                    //console.log("kek")
                 }
             } else {
                 _dragStartSignalled = false
                 dragStop()
+                globals.planMasterControllerPlanView.missionController.removeVisualItem(2)
+                //_missionController.removeVisualItem(2)
+                var vehicleCoordinate = globals.activeVehicle.coordinate
+
+                backend.A = vehicleCoordinate
+                //console.log(vehicleCoordinate)
+                //itemCoordinate.altitude = globals.activeVehicle.homePosition.altitude
+                backend.B = itemCoordinate
+                console.log(backend.angle)
+                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 2, false)
+                //console.log()
+
+                //console.log("success")
+
             }
         }
     }

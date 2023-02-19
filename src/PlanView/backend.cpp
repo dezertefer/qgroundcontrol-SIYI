@@ -87,6 +87,7 @@ QString BackEnd::userName()
 {
 
     return m_userName;
+    //int x = qgcApp()->toolbox()->
 }
 
 double BackEnd::angle()
@@ -392,6 +393,22 @@ void BackEnd::deleteProfile(const QString &profile)
     setCurrentProfile(m_root_map.begin().key());
     writeJson(m_root_map);
 
+}
+
+bool BackEnd::dropPointSelected ()
+{
+
+    return m_dropPointSelected;
+}
+
+void BackEnd::setDropPointSelected (bool &dropPoint)
+{
+    if (dropPoint == m_dropPointSelected)
+        return;
+
+    m_dropPointSelected = dropPoint;
+
+    emit dropPointSelectedChanged();
 }
 
 void BackEnd::writeJson(QVariantMap map)

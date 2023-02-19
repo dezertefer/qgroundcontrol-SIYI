@@ -117,7 +117,13 @@ Item {
             itemIndicator:           _itemVisual
             itemCoordinate:          _missionItem.coordinate
             visible:                 _root.interactive
-            onItemCoordinateChanged: _missionItem.coordinate = itemCoordinate
+            onItemCoordinateChanged:
+            {
+                //tuttutuuut
+                _missionItem.coordinate = itemCoordinate
+               // console.log("coordinate CHanged")
+                //_missionItem.
+            }
         }
     }
 

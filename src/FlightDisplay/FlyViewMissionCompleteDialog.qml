@@ -16,6 +16,7 @@ import QGroundControl               1.0
 import QGroundControl.Controls      1.0
 import QGroundControl.Palette       1.0
 import QGroundControl.ScreenTools   1.0
+import io.qt.examples.backend           1.0
 
 /// Dialog which shows up when a flight completes. Prompts the user for things like whether they should remove the plan from the vehicle.
 Item {
@@ -54,6 +55,9 @@ Item {
         }
     }
 
+    BackEnd {
+           id: backend
+       }
     Component {
         id: missionCompleteDialogComponent
 
@@ -86,8 +90,10 @@ Item {
                         Layout.fillWidth:   true
                         text:               qsTr("Remove plan from vehicle")
                         visible:            !_activeVehicle.communicationLost// && !_activeVehicle.apmFirmware  // ArduPilot has a bug somewhere with mission clear
+
                         onClicked: {
                             _planController.removeAllFromVehicle()
+                            backend.dropPointSelected = false
                             hideDialog()
                         }
                     }
