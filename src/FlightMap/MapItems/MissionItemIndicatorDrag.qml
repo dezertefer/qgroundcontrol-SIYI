@@ -30,7 +30,7 @@ Rectangle {
     z:              QGroundControl.zOrderMapItems + 1    // Above item icons
 
 
-    property var    _missionController:                 _planMasterController.missionController
+   // property var    _missionController:                 _planMasterController.missionController
 
     // Properties which must be specific by consumer
     property var mapControl     ///< Map control which contains this item
@@ -62,6 +62,7 @@ Rectangle {
     BackEnd {
     id: backend
     }
+
     function liveDrag() {
         if (!itemDragger._preventCoordinateBindingLoop && itemDrag.drag.active) {
             var point = Qt.point(itemDragger.x + _touchMarginHorizontal + itemIndicator.anchorPoint.x, itemDragger.y + _touchMarginVertical + itemIndicator.anchorPoint.y)
@@ -104,6 +105,7 @@ Rectangle {
             } else {
                 _dragStartSignalled = false
                 dragStop()
+                //if (MissionItem.se)
                 globals.planMasterControllerPlanView.missionController.removeVisualItem(2)
                 //_missionController.removeVisualItem(2)
                 var vehicleCoordinate = globals.activeVehicle.coordinate
@@ -114,6 +116,7 @@ Rectangle {
                 backend.B = itemCoordinate
                 console.log(backend.angle)
                 globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 2, false)
+                //console.log(globals.planMasterControllerPlanView.missionController.currentPlanViewItem.sequenceNumber)
                 //console.log()
 
                 //console.log("success")

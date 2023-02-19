@@ -346,13 +346,14 @@ Item {
         _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
 
         nextIndex += 1
-
+            //globals.currentPlanMissionItem
+            //_missionController.currentPlanViewItem.sequenceNumber.toFixed()
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
 
         //globals.activeVehicle.homePosition
 
 
-        console.log(nextIndex)
+        //console.log(nextIndex)
 
         nextIndex = _missionController.currentPlanViewVIIndex + 1
 
@@ -360,11 +361,11 @@ Item {
 
         nextIndex += 1
 
-        _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, true /* makeCurrentItem */)
+        _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, false /* makeCurrentItem */)
 
         nextIndex += 1
 
-        _missionController.insertLandItem(vehicleCoordinate, nextIndex, true)
+        _missionController.insertLandItem(vehicleCoordinate, nextIndex, false)
         //_missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
         //dropPointSelected = true
        // QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(true)
@@ -537,7 +538,13 @@ Item {
                 model: _missionController.visualItems
                 delegate: MissionItemMapVisual {
                     map:         editorMap
-                    onClicked:   _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
+                    onClicked:
+                    {
+                        if (sequenceNumber === 4 )
+                        {
+                        _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
+                        }
+                    }
                     opacity:     _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
                     interactive: _editingLayer == _layerMission
                     vehicle:     _planMasterController.controllerVehicle

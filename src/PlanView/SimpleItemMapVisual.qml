@@ -136,7 +136,11 @@ Item {
             z:              QGroundControl.zOrderMapItems
             missionItem:    _missionItem
             sequenceNumber: _missionItem.sequenceNumber
-            onClicked:      if(_root.interactive)  _root.clicked(_missionItem.sequenceNumber)
+            onClicked:
+            {
+                //console.log(_missionItem.sequenceNumber)
+                if(_root.interactive)  _root.clicked(_missionItem.sequenceNumber)
+            }
             opacity:        _root.opacity
         }
     }
