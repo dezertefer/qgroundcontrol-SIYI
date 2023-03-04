@@ -329,47 +329,29 @@ Item {
 
 
     function insertSimpleItemAfterCurrent(coordinate) {
-        //transfer mapCenter() and click coordinate to cpp class
         console.log(backend.dropPointSelected)
         if (!backend.dropPointSelected)
         {
         var vehicleCoordinate = globals.activeVehicle.coordinate
         backend.A = vehicleCoordinate
-
         backend.B = coordinate
         console.log(backend.angle)
-         console.log(backend.C)
-        //backend.BAlt = profiles.altitude
+        console.log(backend.C)
         console.log(QGroundControl.settingsManager.appSettings.defaultMissionItemAltitude.rawValue)
         console.log(_missionController.hasPosition)
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
         _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
-
         nextIndex += 1
-            //globals.currentPlanMissionItem
-            //_missionController.currentPlanViewItem.sequenceNumber.toFixed()
+        _missionController.insertSimpleMissionItem(globals.activeVehicle.coordinate, nextIndex, false /* makeCurrentItem */)
+        nextIndex += 1
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
-
-        //globals.activeVehicle.homePosition
-
-
-        //console.log(nextIndex)
-
-        nextIndex = _missionController.currentPlanViewVIIndex + 1
-
+        nextIndex += 1
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
-
         nextIndex += 1
-
         _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, false /* makeCurrentItem */)
-
         nextIndex += 1
-
         _missionController.insertLandItem(vehicleCoordinate, nextIndex, false)
-        //_missionController.insertSimpleMissionItemMode(coordinate, nextIndex, true /* makeCurrentItem */)
-        //dropPointSelected = true
-       // QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(true)
-            backend.dropPointSelected = true
+        backend.dropPointSelected = true
         }
 
     }
@@ -540,7 +522,7 @@ Item {
                     map:         editorMap
                     onClicked:
                     {
-                        if (sequenceNumber === 4 )
+                        if (sequenceNumber === 6 )
                         {
                         _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
                         }

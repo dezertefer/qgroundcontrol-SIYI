@@ -53,7 +53,7 @@ UrlFactory::UrlFactory() : _timeout(5 * 1000) {
 
     _providersTable["Eniro Topo"] = new EniroMapProvider(this);
 
-    _providersTable["Geoserver Map"] = new GeoserverMapProvider("http://10.147.17.35:8080/geoserver" ,this);
+    _providersTable["Geoserver Map"] = new GeoserverMapProvider("http://103.18.59.173:8080/geoserver" ,this);
     // To be add later on Token entry !
     //_providersTable["Esri World Street"] = new EsriWorldStreetMapProvider(this);
     //_providersTable["Esri World Satellite"] = new EsriWorldSatelliteMapProvider(this);

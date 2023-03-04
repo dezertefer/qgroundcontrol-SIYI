@@ -30,13 +30,8 @@ GeoserverMapProvider::GeoserverMapProvider(QString geoserverURL, QObject *parent
 
 QString GeoserverMapProvider::wmtsVersionString()
 {
-    switch (m_wmtsVersion) {
-    case V1_0_0: return "1.0.0";
-    case V1_1_0: return "1.1.0";
-    case V1_1_1: return "1.1.1";
-    case V1_3_0: return "1.3.0";
-    }
-    return "1.0.0";
+
+    return "1.1.1";
 }
 
 QNetworkRequest GeoserverMapProvider::getTileURL(const int x, const int y, const int zoom, QNetworkAccessManager *networkManager)
@@ -51,14 +46,19 @@ QNetworkRequest GeoserverMapProvider::getTileURL(const int x, const int y, const
         return request;
     }
 
+
+    QString m_workspace1 = "tiger";
+    QString m_mapName1 = "New Zealand merge";
+    unsigned long long m_EPSGNumber1 = 900913;
+
     //NEED REFACTORING
     query.addQueryItem("SERVICE",       m_serviceType);
     query.addQueryItem("VERSION",       wmtsVersionString());
     query.addQueryItem("REQUEST",       m_requestType);
     query.addQueryItem("FORMAT",        "image%2F" + m_imageFormat);
-    query.addQueryItem("LAYER",         m_workspace+"%3A"+m_mapName);
-    query.addQueryItem("TILEMATRIXSET", "EPSG%3A" + QString::number(m_EPSGNumber));
-    query.addQueryItem("TILEMATRIX",    "EPSG%3A" + QString::number(m_EPSGNumber) + "%3A" + QString::number(zoom));
+    query.addQueryItem("LAYER",         m_workspace1+"%3A"+m_mapName1);
+    query.addQueryItem("TILEMATRIXSET", "EPSG%3A" + QString::number(m_EPSGNumber1));
+    query.addQueryItem("TILEMATRIX",    "EPSG%3A" + QString::number(m_EPSGNumber1) + "%3A" + QString::number(zoom));
     query.addQueryItem("TILECOL",       QString::number(x));
     query.addQueryItem("TILEROW",       QString::number(y));
 

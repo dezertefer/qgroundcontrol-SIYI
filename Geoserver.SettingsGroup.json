@@ -9,7 +9,7 @@
     "type":             "uint32",
     "enumStrings":      "V1_0_0,V1_1_0,V1_1_1,V1_3_0",
     "enumValues":       "0,1,2,3",
-    "defaultValue":     "V1_0_0"
+    "defaultValue":     "V1_1_1"
 },
 {
     "name":             "visualImageFormat",
@@ -23,13 +23,13 @@
     "name":             "visualMapWorkspace",
     "shortDescription": "Visual Map Workspace name",
     "type":             "string",
-    "defaultValue":     "nurc"
+    "defaultValue":     "tiger"
 },
 {
     "name":             "visualMapName",
     "shortDescription": "Visual Map name",
     "type":             "string",
-    "defaultValue":     "207(884)"
+    "defaultValue":     "New Zealand merge"
 },
 {
     "name":             "visualEPSGNumber",

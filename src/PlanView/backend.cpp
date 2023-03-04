@@ -35,6 +35,7 @@ QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
     m_C=C;
     m_direction = distance;
     qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(Balt);
+    //qgcApp()->toolbox()->settingsManager()->geoserverSettings()->visualEPSGNumber()->
     return C;
     //CreateJson();
 }
@@ -93,7 +94,7 @@ QString BackEnd::userName()
 double BackEnd::angle()
 {
     BackEnd::calculateC(m_A, m_B);
-    //qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(10);
+    //qgcApp()->toolbox()->settingsManager()->flightMapSettings()->mapProvider()->
     return m_direction;
 }
 

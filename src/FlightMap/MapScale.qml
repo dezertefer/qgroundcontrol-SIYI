@@ -26,6 +26,7 @@ Item {
     property alias  terrainButtonChecked:   terrainButton.checked
     property bool   zoomButtonsVisible:     true
     property bool   buttonsOnLeft:          true    ///< Buttons to left/right of scale bar
+    property bool   mapButton:              false
 
     signal terrainButtonClicked
 
@@ -185,6 +186,42 @@ Item {
     }
 
     QGCButton {
+        id:                 mapTypeButton
+        anchors.top:        scaleText.top
+        anchors.bottom:     rightEnd.bottom
+        anchors.leftMargin: buttonsOnLeft ? 0 : ScreenTools.defaultFontPixelWidth / 2
+        anchors.left:       buttonsOnLeft ? parent.left : rightEnd.right
+        text:               qsTr("M")
+        width:              height
+        opacity:            0.75
+        visible:            true
+        onClicked:
+        {
+           if (QGroundControl.settingsManager.flightMapSettings.mapProvider.rawValue === "Bing")
+           {
+                QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Geoserver"
+                QGroundControl.settingsManager.flightMapSettings.mapType.value=QGroundControl.mapEngineManager.mapTypeList("Geoserver")[0]
+                //mapButton = false
+            }
+           else
+           {
+               QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Bing"
+               QGroundControl.settingsManager.flightMapSettings.mapType.value="Satellite"
+               //mapButton = true
+           }
+               //console.log("123")
+        }
+
+
+       /* Component.onCompleted:
+        {
+            QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Geoserver"
+            QGroundControl.settingsManager.flightMapSettings.mapType.value=QGroundControl.mapEngineManager.mapTypeList("Geoserver")[0]
+
+        }*/
+    }
+
+    QGCButton {
         id:                 terrainButton
         anchors.top:        scaleText.top
         anchors.bottom:     rightEnd.bottom
@@ -193,7 +230,7 @@ Item {
         text:               qsTr("T")
         width:              height
         opacity:            0.75
-        visible:            terrainButtonVisible
+        visible:            false//terrainButtonVisible
         onClicked:          terrainButtonClicked()
     }
 
@@ -206,7 +243,7 @@ Item {
         text:               qsTr("+")
         width:              height
         opacity:            0.75
-        visible:            _zoomButtonsVisible
+        visible:            false//_zoomButtonsVisible
         onClicked:          mapControl.zoomLevel += 0.5
     }
 
@@ -219,7 +256,7 @@ Item {
         text:               qsTr("-")
         width:              height
         opacity:            0.75
-        visible:            _zoomButtonsVisible
+        visible:            false//_zoomButtonsVisible
         onClicked:          mapControl.zoomLevel -= 0.5
     }
 

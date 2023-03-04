@@ -100,27 +100,16 @@ Rectangle {
                 if (!_dragStartSignalled) {
                     _dragStartSignalled = true
                     dragStart()
-                    //console.log("kek")
                 }
             } else {
                 _dragStartSignalled = false
                 dragStop()
-                //if (MissionItem.se)
-                globals.planMasterControllerPlanView.missionController.removeVisualItem(2)
-                //_missionController.removeVisualItem(2)
+                globals.planMasterControllerPlanView.missionController.removeVisualItem(3)
                 var vehicleCoordinate = globals.activeVehicle.coordinate
-
                 backend.A = vehicleCoordinate
-                //console.log(vehicleCoordinate)
-                //itemCoordinate.altitude = globals.activeVehicle.homePosition.altitude
                 backend.B = itemCoordinate
                 console.log(backend.angle)
-                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 2, false)
-                //console.log(globals.planMasterControllerPlanView.missionController.currentPlanViewItem.sequenceNumber)
-                //console.log()
-
-                //console.log("success")
-
+                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 3, false)
             }
         }
     }
