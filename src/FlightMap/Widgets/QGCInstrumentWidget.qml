@@ -24,15 +24,17 @@ ColumnLayout {
 
     property real   _innerRadius:           (width - (_topBottomMargin * 3)) / 4
     property real   _outerRadius:           _innerRadius + _topBottomMargin
-    property real   _spacing:               ScreenTools.defaultFontPixelHeight * 0.33
+    property real   _spacing:               ScreenTools.defaultFontPixelHeight * 0.33 / 2
     property real   _topBottomMargin:       (width * 0.05) / 2
 
     QGCPalette { id: qgcPal }
 
     Rectangle {
         id:                 visualInstrument
-        height:             _outerRadius * 2
-        Layout.fillWidth:   true
+        height:             _outerRadius
+        //Layout.fillWidth:   true
+        anchors.right:      parent.right
+        anchors.left:       parent.horizontalCenter
         radius:             _outerRadius
         color:              qgcPal.window
 
@@ -40,9 +42,9 @@ ColumnLayout {
 
         QGCAttitudeWidget {
             id:                     attitude
-            anchors.leftMargin:     _topBottomMargin
+            anchors.leftMargin:     _topBottomMargin/2
             anchors.left:           parent.left
-            size:                   _innerRadius * 2
+            size:                   _innerRadius
             vehicle:                globals.activeVehicle
             anchors.verticalCenter: parent.verticalCenter
         }
@@ -51,7 +53,7 @@ ColumnLayout {
             id:                     compass
             anchors.leftMargin:     _spacing
             anchors.left:           attitude.right
-            size:                   _innerRadius * 2
+            size:                   _innerRadius
             vehicle:                globals.activeVehicle
             anchors.verticalCenter: parent.verticalCenter
         }

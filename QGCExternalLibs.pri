@@ -317,7 +317,7 @@ contains (DEFINES, DISABLE_AIRMAP) {
         PRE_TARGETDEPS += $$airmap_platform_sdk_install.target
 
         LIBS += -L$${AIRMAP_PLATFORM_SDK_PATH}/linux/$${AIRMAP_QT_PATH} -lairmap-cpp
-        DEFINES += QGC_AIRMAP_ENABLED
+        #DEFINES += QGC_AIRMAP_ENABLED
     } else {
         message("Skipping support for Airmap (unsupported platform)")
     }

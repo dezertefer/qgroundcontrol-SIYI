@@ -280,6 +280,7 @@ Item {
 //                {
 //                    console.log("KEKEKEKEKEKE")
 //                }
+
                 _planMasterController.upload()
                 //console.log(_uploadAllowed)
             }

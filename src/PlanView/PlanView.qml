@@ -330,7 +330,14 @@ Item {
 
     function insertSimpleItemAfterCurrent(coordinate) {
         console.log(backend.dropPointSelected)
-        if (!backend.dropPointSelected)
+        //console.log("RemoveAllFromVehicle")
+        //_planMasterController.removeAllFromVehicle()
+        //_missionController.setCurrentPlanViewSeqNum(0, true)
+        //_planController.removeAllFromVehicle()
+        //console.log(backend.dropPointSelected)
+        //_missionController.insertTakeoffItem(globals.activeVehicle.coordinate, 1, true /* makeCurrentItem */)
+        //_missionController.containsItems
+        if (!backend.dropPointSelected && _missionController.currentPlanViewVIIndex ===0 && _missionController.currentPlanViewSeqNum ===0 && !_missionController.containsItems)
         {
         var vehicleCoordinate = globals.activeVehicle.coordinate
         backend.A = vehicleCoordinate
@@ -339,6 +346,9 @@ Item {
         console.log(backend.C)
         console.log(QGroundControl.settingsManager.appSettings.defaultMissionItemAltitude.rawValue)
         console.log(_missionController.hasPosition)
+        console.log(_missionController.currentPlanViewVIIndex)
+        console.log(_missionController.currentPlanViewSeqNum)
+        //console.log(_missionController.)
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
         _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
         nextIndex += 1
@@ -352,6 +362,11 @@ Item {
         nextIndex += 1
         _missionController.insertLandItem(vehicleCoordinate, nextIndex, false)
         backend.dropPointSelected = true
+        }else{
+            _planMasterController.removeAllFromVehicle()
+            _missionController.setCurrentPlanViewSeqNum(0, true)
+            backend.dropPointSelected = false
+            mainWindow.showComponentDialog(missionWasNotClean, "Clean", mainWindow.showDialogDefaultWidth, StandardButton.Yes)
         }
 
     }
@@ -1033,6 +1048,19 @@ Item {
             }
         }
     }
+
+    Component {
+        id: missionWasNotClean
+        QGCViewMessage {
+            message: qsTr("There is a chance that mission was not clean, we cleared it for you. Please try again to add drop point")
+            function accept() {
+                //_planMasterController.removeAllFromVehicle()
+                //_missionController.setCurrentPlanViewSeqNum(0, true)
+                hideDialog()
+            }
+        }
+    }
+
 
     //- ToolStrip DropPanel Components
 
