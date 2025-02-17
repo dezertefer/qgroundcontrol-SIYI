@@ -85,6 +85,8 @@ ApplicationWindow {
         readonly property var       planMasterControllerFlyView:    flightView.planController
         readonly property var       guidedControllerFlyView:        flightView.guidedController
 
+        property var                pointToAdd:                     {"label": "Point", "lat": 0, "lon": 0}
+
         property var                planMasterControllerPlanView:   null
         property var                currentPlanMissionItem:         planMasterControllerPlanView ? planMasterControllerPlanView.missionController.currentPlanViewItem : null
     }

@@ -110,6 +110,8 @@ Rectangle {
                 backend.B = itemCoordinate
                 console.log(backend.angle)
                 globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 3, false)
+                globals.pointToAdd.lat = itemCoordinate.latitude
+                globals.pointToAdd.lon = itemCoordinate.longitude
             }
         }
     }

@@ -32,8 +32,8 @@ QGC_LOGGING_CATEGORY(MockLinkVerboseLog, "MockLinkVerboseLog")
 // Vehicle position is set close to default Gazebo vehicle location. This allows for multi-vehicle
 // testing of a gazebo vehicle and a mocklink vehicle
 #if 1
-double      MockLink::_defaultVehicleLatitude =     47.397;
-double      MockLink::_defaultVehicleLongitude =    8.5455;
+double      MockLink::_defaultVehicleLatitude =     -36.8485;
+double      MockLink::_defaultVehicleLongitude =    174.7633;
 double      MockLink::_defaultVehicleAltitude =     488.056;
 #else
 double      MockLink::_defaultVehicleLatitude =     47.6333022928789;

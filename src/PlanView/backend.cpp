@@ -15,7 +15,7 @@ BackEnd::BackEnd(QObject *parent) :
     QObject(parent)
 {
     readJson();
-
+    readDropPoints();
 }
 
 BackEnd::BackEnd(QString path)
@@ -304,6 +304,160 @@ void BackEnd::readJson ()
 
 
 
+}
+
+
+void BackEnd::readDropPoints()
+{
+    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/DropPoints.json";
+    QFile file(file_path);
+    if (file.open(QIODevice::ReadOnly))        {
+        QByteArray data = file.readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isArray()) {
+            QJsonArray dropPointsArray = doc.array();
+            QVariantList dropPointList;
+            for (const QJsonValue &value : dropPointsArray) {
+                if (value.isObject()) {
+                    QJsonObject dropPointObj = value.toObject();
+                    QVariantMap dropPointMap;
+                    dropPointMap["date"] = dropPointObj["date"].toString();
+                    dropPointMap["rating"] = dropPointObj["rating"].toInt();
+                    dropPointMap["lat"] = dropPointObj["lat"].toDouble();
+                    dropPointMap["lon"] = dropPointObj["lon"].toDouble();
+                    dropPointMap["label"] = dropPointObj["label"].toString();
+                    dropPointMap["counter"] = dropPointObj["counter"].toInt();
+                    // Display the drop point in the console
+                    qDebug() << "Drop Point:";
+                    qDebug() << "Date:" << dropPointMap["date"].toString();
+                    qDebug() << "Rating:" << dropPointMap["rating"].toInt();
+                    qDebug() << "Latitude:" << dropPointMap["lat"].toDouble();
+                    qDebug() << "Longitude:" << dropPointMap["lon"].toDouble();
+                    qDebug() << "Label:" << dropPointMap["label"].toString();
+                    qDebug() << "Counter:" << dropPointMap["counter"].toInt();
+                    qDebug() << "-------------------------";
+
+                    dropPointList.append(dropPointMap);
+                }
+            }
+            m_dropPoints = dropPointList;
+            emit dropPointsChanged();
+        }
+        file.close();        }
+    else {
+        qDebug() << "Failed to open the file!";
+    }
+
+}
+
+QVariantList BackEnd::dropPoints(){
+    return m_dropPoints;
+}
+
+void BackEnd::setDropPoints(const QVariantList &dropPoints){
+    if(m_dropPoints!=dropPoints){
+        m_dropPoints = dropPoints;
+        emit dropPointsChanged();
+    }
+}
+
+void BackEnd::addDropPoint(const QString &label, double lat, double lon) {
+    const double maxDistance = 50.0;  // 50 meters
+    QGeoCoordinate newDropPointCoord(lat, lon);
+
+    // Check if the new drop point is within 50 meters of any existing drop point
+    for (int i = 0; i < m_dropPoints.size(); ++i) {
+        QVariantMap pointMap = m_dropPoints[i].toMap();
+        double existingLat = pointMap["lat"].toDouble();
+        double existingLon = pointMap["lon"].toDouble();
+        QGeoCoordinate existingDropPointCoord(existingLat, existingLon);
+
+        double distance = newDropPointCoord.distanceTo(existingDropPointCoord);
+
+        if (distance <= maxDistance) {
+            // If within 50 meters, increment the counter of the existing drop point
+            int counter = pointMap["counter"].toInt();
+            pointMap["counter"] = counter + 1;
+            m_dropPoints[i] = pointMap;  // Update the drop point in the list
+            emit dropPointsChanged();
+            saveToFile();
+            return;  // No need to add a new drop point, exit early
+        }
+    }
+
+
+    // If no close drop point was found, add the new one
+    QVariantMap newDropPoint;
+    newDropPoint["date"] = QDateTime::currentDateTime().toString();
+    newDropPoint["rating"] = 0;  // default rating
+    newDropPoint["lat"] = lat;
+    newDropPoint["lon"] = lon;
+    newDropPoint["label"] = label;
+    newDropPoint["counter"] = 1;  // New point, so counter starts at 1
+
+    m_dropPoints.append(newDropPoint);
+    emit dropPointsChanged();
+    saveToFile();
+}
+
+void BackEnd::removeDropPoint(int index) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        m_dropPoints.removeAt(index);
+        emit dropPointsChanged();
+        saveToFile();
+    }
+}
+
+void BackEnd::changeLabel(int index, const QString &newLabel) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        m_dropPoints[index].toMap()["label"] = newLabel;
+        emit dropPointsChanged();
+        saveToFile();
+    }
+}
+
+void BackEnd::increaseCounter(int index) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        int counter = m_dropPoints[index].toMap()["counter"].toInt();
+        m_dropPoints[index].toMap()["counter"] = counter + 1;
+        emit dropPointsChanged();
+        saveToFile();
+    }
+}
+
+void BackEnd::changeRating(int index, int newRating) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        qDebug() << newRating;
+        m_dropPoints[index].toMap()["rating"] = newRating;
+        emit dropPointsChanged();
+        saveToFile();
+    }
+}
+
+void BackEnd::saveToFile() {
+    QString file_path = qgcApp()->toolbox()->settingsManager()->appSettings()->profileDirectorySavePath() + "/DropPoints.json";
+    QFile file(file_path);
+
+    if (file.open(QIODevice::WriteOnly)) {
+        QJsonArray dropPointsArray;
+        for (const QVariant &point : m_dropPoints) {
+            QVariantMap pointMap = point.toMap();
+            QJsonObject dropPointObj;
+            dropPointObj["date"] = pointMap["date"].toString();
+            dropPointObj["rating"] = pointMap["rating"].toInt();
+            dropPointObj["lat"] = pointMap["lat"].toDouble();
+            dropPointObj["lon"] = pointMap["lon"].toDouble();
+            dropPointObj["label"] = pointMap["label"].toString();
+            dropPointObj["counter"] = pointMap["counter"].toInt();
+            dropPointsArray.append(dropPointObj);
+        }
+
+        QJsonDocument doc(dropPointsArray);
+        file.write(doc.toJson());
+        file.close();
+    } else {
+        qDebug() << "Failed to open file for saving!";
+    }
 }
 
 void BackEnd::editProfile (const QString &profile)

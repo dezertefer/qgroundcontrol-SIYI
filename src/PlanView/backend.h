@@ -24,6 +24,7 @@ class BackEnd : public QObject
     Q_PROPERTY(QStringList profileList READ profileList NOTIFY profileListChanged)
     Q_PROPERTY(QString editProfile WRITE editProfile NOTIFY editProfileChanged)
     Q_PROPERTY(bool dropPointSelected READ dropPointSelected WRITE setDropPointSelected NOTIFY dropPointSelectedChanged)
+    Q_PROPERTY(QVariantList dropPoints READ dropPoints WRITE setDropPoints NOTIFY dropPointsChanged)
 
     QML_ELEMENT
 
@@ -33,6 +34,13 @@ public:
     bool dropPointSelected();
     void setDropPointSelected(bool &dropPoint);
 
+    Q_INVOKABLE void addDropPoint(const QString &label, double lat, double lon);
+    Q_INVOKABLE void removeDropPoint(int index);
+    Q_INVOKABLE void changeLabel(int index, const QString &newLabel);
+    Q_INVOKABLE void increaseCounter(int index);
+    Q_INVOKABLE void changeRating(int index, int newRating);
+
+    void saveToFile();
     QString userName();
     void CreateJson();
     QGeoCoordinate A();
@@ -44,6 +52,7 @@ public:
     void deleteProfile(const QString &profile);
 
     void readJson();
+    void readDropPoints();
     void writeJson(QVariantMap map);
 
     void updateCurrentProfile(QString profile);
@@ -59,7 +68,7 @@ public:
     void setUserName(const QString &userName);
     void setCurrentProfile(const QString &profile);
 
-
+    void setDropPoints(const QVariantList &dropPoints);
 
     void setAngle(double &newAngle);
 
@@ -70,6 +79,8 @@ public:
     void setC(const QGeoCoordinate &newC);
 
     QVariantMap profiles();
+
+    QVariantList dropPoints();
 
 
 signals:
@@ -92,6 +103,8 @@ signals:
 
     void dropPointSelectedChanged();
 
+    void dropPointsChanged();
+
 private:
     QString m_userName;
     QGeoCoordinate m_A;
@@ -106,6 +119,7 @@ private:
 
     QVariantMap m_root_map;
     QVariantMap m_selectedProfile;
+    QVariantList m_dropPoints;
 
     QStringList m_profileList;
 };

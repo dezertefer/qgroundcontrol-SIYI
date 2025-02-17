@@ -10,10 +10,11 @@
 import QtQuick          2.3
 import QtQuick.Controls 1.2
 import QtQuick.Dialogs  1.2
-import QtLocation       5.3
-import QtPositioning    5.3
+import QtLocation       5.15
+import QtPositioning    5.15
 import QtQuick.Layouts  1.2
 import QtQuick.Window   2.2
+import QtGraphicalEffects 1.12
 
 import QGroundControl                   1.0
 import QGroundControl.FlightMap         1.0
@@ -26,6 +27,7 @@ import QGroundControl.Controllers       1.0
 import QGroundControl.ShapeFileHelper   1.0
 import QGroundControl.Airspace          1.0
 import QGroundControl.Airmap            1.0
+
 import io.qt.examples.backend           1.0
 
 
@@ -61,6 +63,8 @@ Item {
     property bool   _isEdit:                            false
     property bool   _isNew:                             false
     property bool   _isDel:                             false
+    property var    historyItemData
+    //property var    pointToAdd: {"lat": 0 , "lon":0}
 
     readonly property var       _layers:                [_layerMission, _layerGeoFence, _layerRallyPoints]
 
@@ -86,8 +90,6 @@ Item {
             }
         }
     }
-
-
 
     property bool _firstMissionLoadComplete:    false
     property bool _firstFenceLoadComplete:      false
@@ -266,6 +268,7 @@ Item {
             }
             switch (_missionController.sendToVehiclePreCheck()) {
                 case MissionController.SendToVehiclePreCheckStateOk:
+                    backend.addDropPoint("Point", globals.pointToAdd.lat, globals.pointToAdd.lon)
                     sendToVehicle()
                     break
                 case MissionController.SendToVehiclePreCheckStateActiveMission:
@@ -326,7 +329,9 @@ Item {
     /*BackEnd {
            id: backend
        }*/
+    function openHistory(){
 
+    }
 
     function insertSimpleItemAfterCurrent(coordinate) {
         console.log(backend.dropPointSelected)
@@ -357,6 +362,9 @@ Item {
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
         nextIndex += 1
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
+        //pointToAdd.label = "Point"
+        globals.pointToAdd.lat = coordinate.latitude
+        globals.pointToAdd.lon = coordinate.longitude
         nextIndex += 1
         _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, false /* makeCurrentItem */)
         nextIndex += 1
@@ -518,6 +526,8 @@ Item {
                         } else if (_addROIOnClick) {
                             insertROIAfterCurrent(coordinate)
                             _addROIOnClick = false
+                        } else if (history.checked) {
+                            openHistory();
                         }
 
                         break
@@ -625,6 +635,66 @@ Item {
                     map:            editorMap
                     size:           ScreenTools.defaultFontPixelHeight * 3
                     z:              QGroundControl.zOrderMapItems - 1
+                }
+            }
+
+            MapItemView {
+                id: historyDropPoints
+                model: backend.dropPoints
+                property var dummyModel : backend.dropPoints
+                visible: false
+                delegate: MapQuickItem {
+                    coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
+
+                    sourceItem: Rectangle {
+                        width: ScreenTools.defaultFontPixelHeight * 1.5
+                        height: ScreenTools.defaultFontPixelHeight * 1.5
+                        color: "transparent"
+                        border.color: "transparent"
+                        radius: ScreenTools.defaultFontPixelHeight * 0.75
+                        Image{
+                            id: pinpoint
+                            source:"/InstrumentValueIcons/location.svg"
+                            //color: "brown"
+                            width: parent.width
+                            height: parent.height
+                        }
+
+                        ColorOverlay{
+                            anchors.fill: pinpoint
+                            source:pinpoint
+                            color: "green"
+                            transform:rotation
+                            antialiasing: true
+                        }
+
+                        x: -width/2
+                        y: -height
+
+                        // Debugging
+                        // Text {
+                        //     text: "Lat: " + model.lat + " Lon: " + model.lon
+                        //     color: "black"
+                        //     anchors.centerIn: parent
+                        // }
+
+                        MouseArea{
+                            anchors.fill: parent
+                            onClicked: {
+                                    console.log("mapItemClicked")
+                                    historyItemData = historyDropPoints.dummyModel[index]
+                                    historyItemData.index = index
+                                    mainWindow.showPopupDialogFromComponent(historyItemPopUp)
+                            }
+                        }
+                    }
+
+
+                }
+
+                onModelChanged: {
+                    console.log("Model updated", model);
+                    historyDropPoints.dummyModel = backend.dropPoints
                 }
             }
 
@@ -776,13 +846,22 @@ Item {
                     },
 
                     ToolStripAction {
+                        id:                 history
                         text:               qsTr("History")
                         iconSource:         "/qmlimages/MapAddMission.svg"
                         enabled:            true
                         visible:            true
-                        // onClicked:{
-
-                        // }
+                        checkable:          true
+                        onCheckedChanged: {
+                            if(checked){
+                                // _planMasterController.removeAllFromVehicle()
+                                // _missionController.setCurrentPlanViewSeqNum(0, true)
+                                // backend.dropPointSelected = false
+                                historyDropPoints.visible = true
+                            } else {
+                                historyDropPoints.visible = false
+                            }
+                        }
                     }
 
                 ]
@@ -793,6 +872,7 @@ Item {
             function allAddClickBoolsOff() {
                 _addROIOnClick =        false
                 addWaypointRallyPointAction.checked = false
+                history.checked = false
             }
 
             onDropped: allAddClickBoolsOff()
@@ -1008,6 +1088,99 @@ Item {
             terrainButtonVisible:   _editingLayer === _layerMission
             terrainButtonChecked:   terrainStatus.visible
             onTerrainButtonClicked: terrainStatus.toggleVisible()
+        }
+    }
+    Component {
+        id: historyItemPopUp
+
+        QGCPopupDialog {
+            id:         historyItemPopUpDialog
+            title:      qsTr(historyItemData.label)
+            buttons:    StandardButton.Close
+
+            ColumnLayout {
+                //spacing: _margins
+
+                GridLayout {
+                    id:     gridLayout
+                    flow:   GridLayout.TopToBottom
+                    rows:   3
+
+                    QGCLabel {
+                        text:               qsTr("Drop Point Rating")
+                        visible:            true
+                        //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                    }
+
+
+                    QGCLabel {
+                        text:               "Times used"
+                        visible:            true
+                        //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                    }
+
+                    QGCButton {
+                        text: "Use again"
+                        enabled: globals.activeVehicle && globals.activeVehicle.coordinate.isValid
+                        onClicked:{
+                            if(globals.activeVehicle && globals.activeVehicle.coordinate.isValid){
+                                historyItemPopUpDialog.hideDialog()
+                                insertSimpleItemAfterCurrent(QtPositioning.coordinate(historyItemData.lat, historyItemData.lon))
+                            }
+                        }
+                    }
+
+
+
+                    RowLayout{
+                        QGCButton{
+                            text: "-"
+                            onClicked:{
+                                if(historyItemData.rating>1){
+                                    historyItemData.rating = historyItemData.rating-1
+                                    rating.text = historyItemData.rating
+                                    backend.changeRating(historyItemData.index, historyItemData.rating)
+                                }
+                            }
+                        }
+
+                        QGCLabel {
+                            id:                 rating
+                            text:               historyItemData.rating
+                            visible:            true
+                            //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                        }
+
+                        QGCButton{
+                            text: "+"
+                            onClicked:{
+                                if(historyItemData.rating<5){
+                                    historyItemData.rating = historyItemData.rating+1
+                                    rating.text = historyItemData.rating
+                                    backend.changeRating(historyItemData.index, historyItemData.rating+1)
+                                }
+                            }
+                        }
+                    }
+
+                    QGCLabel {
+                        text:               historyItemData.counter
+                        visible:            true
+                    }
+
+                    QGCButton {
+                        text: "Remove Drop point"
+                        onClicked:{
+                            backend.removeDropPoint(historyItemData.index)
+                            historyItemPopUpDialog.hideDialog()
+                        }
+                    }
+                    // QGCButton {
+                    //     text: "Change rating"
+                    // }
+
+                }
+            }
         }
     }
 
