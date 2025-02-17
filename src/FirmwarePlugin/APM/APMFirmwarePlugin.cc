@@ -898,7 +898,7 @@ void APMFirmwarePlugin::startMission(Vehicle* vehicle)
             return;
         }
     } else {
-        //vehicle->sendMavCommand(vehicle->defaultComponentId(), MAV_CMD_MISSION_START, true /*show error */);
+        vehicle->sendMavCommand(vehicle->defaultComponentId(), MAV_CMD_MISSION_START, false /*show error */);
     }
 }
 

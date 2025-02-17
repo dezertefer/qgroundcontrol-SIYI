@@ -22,19 +22,27 @@ ColumnLayout {
     id:         root
     spacing:    ScreenTools.defaultFontPixelHeight / 4
 
-    property real   _innerRadius:           (width - (_topBottomMargin * 3)) / 4
+    property real   _innerRadius:           (width - (_topBottomMargin * 3)) / 2.62
     property real   _outerRadius:           _innerRadius + _topBottomMargin
-    property real   _spacing:               ScreenTools.defaultFontPixelHeight * 0.33 / 2
+    property real   _spacing:               ScreenTools.defaultFontPixelHeight * 0.33 / 1.5
     property real   _topBottomMargin:       (width * 0.05) / 2
 
     QGCPalette { id: qgcPal }
+
+    Rectangle{
+        id: dummyRectangle
+        width: parent.width/4
+        anchors.left: parent.left
+        color: "transparent"
+        //height:_outerRadius
+    }
 
     Rectangle {
         id:                 visualInstrument
         height:             _outerRadius
         //Layout.fillWidth:   true
         anchors.right:      parent.right
-        anchors.left:       parent.horizontalCenter
+        anchors.left:       dummyRectangle.right
         radius:             _outerRadius
         color:              qgcPal.window
 

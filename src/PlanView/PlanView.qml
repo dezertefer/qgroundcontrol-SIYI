@@ -773,7 +773,18 @@ Item {
                         enabled:            true
                         visible:            true
                         dropPanelComponent: centerMapDropPanel
+                    },
+
+                    ToolStripAction {
+                        text:               qsTr("History")
+                        iconSource:         "/qmlimages/MapAddMission.svg"
+                        enabled:            true
+                        visible:            true
+                        // onClicked:{
+
+                        // }
                     }
+
                 ]
             }
 

@@ -63,15 +63,33 @@ Rectangle {
             anchors.right:  parent.right
             spacing:        ScreenTools.defaultFontPixelWidth * 0.25
 
-            QGCLabel {
-                id:                     titleLabel
-                anchors.left:           parent.left
-                anchors.right:          parent.right
-                horizontalAlignment:    Text.AlignHCenter
-                font.pointSize:         ScreenTools.smallFontPointSize*1.2
-                font.bold:              true
-                visible:                title != ""
+            Rectangle{
+                width: _root.width - ScreenTools.defaultFontPixelWidth * 0.8
+                height: ScreenTools.smallFontPointSize*1.2*6
+                radius: flickable.anchors.margins
+                color: "black"
+                QGCLabel {
+                    id:                     titleLabel
+                    anchors.left:           parent.left
+                    anchors.right:          parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    horizontalAlignment:    Text.AlignHCenter
+                    font.pointSize:         ScreenTools.smallFontPointSize*1.2
+                    font.bold:              true
+                    visible:                title != ""
+                    color: "white"
+                }
             }
+
+            // QGCLabel {
+            //     id:                     titleLabel
+            //     anchors.left:           parent.left
+            //     anchors.right:          parent.right
+            //     horizontalAlignment:    Text.AlignHCenter
+            //     font.pointSize:         ScreenTools.smallFontPointSize*1.2
+            //     font.bold:              true
+            //     visible:                title != ""
+            // }
 
             Repeater {
                 id: repeater
