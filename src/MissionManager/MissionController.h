@@ -122,6 +122,8 @@ public:
     /// @return Newly created item
     Q_INVOKABLE VisualMissionItem* insertSimpleMissionItem(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
 
+    //Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemSpeed(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
+
     Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemServo(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);
 
     Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemMode(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem = false);

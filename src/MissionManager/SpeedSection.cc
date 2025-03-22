@@ -87,29 +87,35 @@ int SpeedSection::itemCount(void) const
 void SpeedSection::appendSectionItems(QList<MissionItem*>& items, QObject* missionItemParent, int& seqNum)
 {
     // IMPORTANT NOTE: If anything changes here you must also change SpeedSection::scanForSettings
-
+    //qDebug()<<"ALOHA";
     if (_specifyFlightSpeed) {
-        MissionItem* item = new MissionItem(seqNum++,
-                                            MAV_CMD_DO_CHANGE_SPEED,
-                                            MAV_FRAME_MISSION,
-                                            _masterController->controllerVehicle()->multiRotor() ? 1 /* groundspeed */ : 0 /* airspeed */,    // Change airspeed or groundspeed
-                                            _flightSpeedFact.rawValue().toDouble(),
-                                            -1,                                                                 // No throttle change
-                                            0,                                                                  // Absolute speed change
-                                            0, 0, 0,                                                            // param 5-7 not used
-                                            true,                                                               // autoContinue
-                                            false,                                                              // isCurrentItem
-                                            missionItemParent);
-        items.append(item);
+
+            MissionItem* item = new MissionItem(seqNum++,
+                                                MAV_CMD_DO_CHANGE_SPEED,
+                                                MAV_FRAME_MISSION,
+                                                _masterController->controllerVehicle()->multiRotor() ? 1 : 0 /* airspeed */,    // Change airspeed or groundspeed
+                                                _flightSpeedFact.rawValue().toDouble(),
+                                                -1,                                                                 // No throttle change
+                                                0,                                                                  // Absolute speed change
+                                                0, 0, 0,                                                            // param 5-7 not used
+                                                true,                                                               // autoContinue
+                                                false,                                                              // isCurrentItem
+                                                missionItemParent);
+            items.append(item);
+
+
+
     }
 }
 
 bool SpeedSection::scanForSection(QmlObjectListModel* visualItems, int scanIndex)
 {
+
+        qDebug()<<"ALOHA";
     if (!_available || scanIndex >= visualItems->count()) {
         return false;
     }
-
+        qDebug()<<"ALOHA2";
     SimpleMissionItem* item = visualItems->value<SimpleMissionItem*>(scanIndex);
     if (!item) {
         // We hit a complex item, there can't be a speed setting
@@ -125,6 +131,7 @@ bool SpeedSection::scanForSection(QmlObjectListModel* visualItems, int scanIndex
         } else if (_masterController->controllerVehicle()->fixedWing() && missionItem.param1() != 0) {
             return false;
         }
+        qDebug()<<"ALOHA3";
         visualItems->removeAt(scanIndex)->deleteLater();
         _flightSpeedFact.setRawValue(missionItem.param2());
         setSpecifyFlightSpeed(true);

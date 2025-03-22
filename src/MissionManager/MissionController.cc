@@ -314,28 +314,29 @@ VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordin
 {
     int sequenceNumber = _nextSequenceNumber();
     SimpleMissionItem * newItem = new SimpleMissionItem(_masterController, _flyView, false /* forLoad */);
-    if (visualItemIndex == 2)
+    if (visualItemIndex == 2 /*|| visualItemIndex == 3*/)
     {
         newItem->speedSection()->setSpecifyFlightSpeed(true);
         newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toDouble());
         //newItem->al
         newItem->altitude()->setRawValue(3.0);
-        newItem->missionItem().setParam1(1.0);
-        qDebug() << "speed section " << newItem->altitude()->rawValue().toDouble();
+        newItem->missionItem().setParam1(1);
+        // if(visualItemIndex ==3){
+        //     newItem->missionItem().setParam1(2);
+        // }
+        qDebug() << "speed section " << sequenceNumber;
     }
     newItem->setSequenceNumber(sequenceNumber);
     newItem->setCoordinate(coordinate);
     newItem->setCommand(command);
-
-
 
     if (visualItemIndex == 3)
     {
         newItem->speedSection()->setSpecifyFlightSpeed(true);
         newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble());
     }
-    _initVisualItem(newItem);
 
+    _initVisualItem(newItem);
     if (newItem->specifiesAltitude()) {
         if (!qgcApp()->toolbox()->missionCommandTree()->isLandCommand(command)) {
             double                              prevAltitude;
@@ -387,6 +388,11 @@ VisualMissionItem* MissionController::insertSimpleMissionItem(QGeoCoordinate coo
 {
     return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_NAV_WAYPOINT, visualItemIndex, makeCurrentItem);
 }
+
+// VisualMissionItem* MissionController::insertSimpleMissionItemSpeed(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
+// {
+//     return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_DO_CHANGE_SPEED, visualItemIndex, makeCurrentItem);
+// }
 
 VisualMissionItem* MissionController::insertSimpleMissionItemServo(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
 {

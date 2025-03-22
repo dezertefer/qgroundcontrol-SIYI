@@ -105,11 +105,13 @@ Rectangle {
                 _dragStartSignalled = false
                 dragStop()
                 globals.planMasterControllerPlanView.missionController.removeVisualItem(3)
+                globals.planMasterControllerPlanView.missionController.removeVisualItem(3)
                 var vehicleCoordinate = globals.activeVehicle.coordinate
                 backend.A = vehicleCoordinate
                 backend.B = itemCoordinate
                 console.log(backend.angle)
-                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 3, false)
+                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.D, 3, false)
+                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 4, false)
                 globals.pointToAdd.lat = itemCoordinate.latitude
                 globals.pointToAdd.lon = itemCoordinate.longitude
             }

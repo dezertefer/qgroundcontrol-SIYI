@@ -456,6 +456,11 @@ QJsonDocument PlanMasterController::saveToJson()
     return QJsonDocument(planJson);
 }
 
+QJsonDocument PlanMasterController::getJson()
+{
+    return saveToJson();
+}
+
 void
 PlanMasterController::saveToCurrent()
 {

@@ -256,8 +256,8 @@ Item {
                 waitingOnIncompleteDataMessage(save)
                 return false
             } else if (readyForSaveState() == VisualMissionItem.NotReadyForSaveTerrain) {
-                waitingOnTerrainDataMessage(save)
-                return false
+                //waitingOnTerrainDataMessage(save)
+                //return false
             }
             return true
         }
@@ -353,13 +353,21 @@ Item {
         console.log(_missionController.hasPosition)
         console.log(_missionController.currentPlanViewVIIndex)
         console.log(_missionController.currentPlanViewSeqNum)
+        var dCoordinate = backend.D
         //console.log(_missionController.)
         var nextIndex = _missionController.currentPlanViewVIIndex + 1
         _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
         nextIndex += 1
+        //_missionController.insertSimpleMissionItem(globals.activeVehicle.coordinate, nextIndex, false /* makeCurrentItem */)
+        //nextIndex += 1
         _missionController.insertSimpleMissionItem(globals.activeVehicle.coordinate, nextIndex, false /* makeCurrentItem */)
         nextIndex += 1
+        _missionController.insertSimpleMissionItem(backend.D, nextIndex, true /* makeCurrentItem */)
+
+        nextIndex += 1
         _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
+
+
         nextIndex += 1
         _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
         //pointToAdd.label = "Point"
@@ -376,6 +384,8 @@ Item {
             backend.dropPointSelected = false
             mainWindow.showComponentDialog(missionWasNotClean, "Clean", mainWindow.showDialogDefaultWidth, StandardButton.Yes)
         }
+
+        console.log(_planMasterController.getJson())
 
     }
 
@@ -547,7 +557,7 @@ Item {
                     map:         editorMap
                     onClicked:
                     {
-                        if (sequenceNumber === 6 )
+                        if (sequenceNumber === 7 )
                         {
                         _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
                         }
@@ -596,7 +606,7 @@ Item {
                 anchorPoint.x:  sourceItem.width / 2
                 anchorPoint.y:  sourceItem.height / 2
                 z:              QGroundControl.zOrderWaypointLines + 1
-                visible:        false// _editingLayer == _layerMission
+                visible:         false//_editingLayer == _layerMission
 
                 sourceItem: SplitIndicator {
                     onClicked:  _missionController.insertSimpleMissionItem(splitSegmentItem.coordinate,
@@ -889,7 +899,7 @@ Item {
             anchors.bottom:     parent.bottom
             anchors.right:      parent.right
             anchors.rightMargin: _toolsMargin
-            visible: false
+            visible: false//true
         }
         //-------------------------------------------------------
         // Right Panel Controls
@@ -921,7 +931,7 @@ Item {
                     height:     planControlColapsed ? colapsedRow.height + ScreenTools.defaultFontPixelHeight : 0
                     color:      qgcPal.missionItemEditor
                     radius:     _radius
-                    visible:    false//planControlColapsed && _airspaceEnabled
+                    visible:    planControlColapsed && _airspaceEnabled
                     Row {
                         id:                     colapsedRow
                         spacing:                ScreenTools.defaultFontPixelWidth
@@ -1066,7 +1076,7 @@ Item {
             //anchors.bottom:     parent.bottom
             height:             ScreenTools.defaultFontPixelHeight * 7
             missionController:  _missionController
-            visible:            false//_internalVisible && _editingLayer === _layerMission && QGroundControl.corePlugin.options.showMissionStatus
+            visible:           false// _internalVisible && _editingLayer === _layerMission && QGroundControl.corePlugin.options.showMissionStatus
 
             onSetCurrentSeqNum: _missionController.setCurrentPlanViewSeqNum(seqNum, true)
 
@@ -1402,6 +1412,29 @@ Item {
                     Layout.preferredWidth:  _valueFieldWidth
                     //readOnly: true
                     visible: _isNew
+                }
+
+                QGCLabel
+                {
+                text: qsTr("Cable length:")
+                }
+                FactTextField
+                {
+                    id:cableLengthFactTextField
+                    fact: _planViewSettings.currentProfileCableLength
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: !_isNew
+                    enabled: _isEdit
+                }
+                FactTextField
+                {
+                    id:newCableLengthFactTextField
+                    fact: _planViewSettings.currentProfileCableLength
+                    Layout.preferredWidth:  _valueFieldWidth
+                    //readOnly: true
+                    visible: _isNew
+                    //enabled: _isEdit
                 }
 
 

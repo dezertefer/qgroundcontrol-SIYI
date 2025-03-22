@@ -78,6 +78,16 @@
     "decimalPlaces":    1
 },
 {
+    "name":         "currentProfileCableLength",
+    "shortDesc":    "Profile cable Length",
+    "type":         "double",
+    "default":      100.0,
+    "units":        "m",
+    "min":          50.0,
+    "max":          500.0,
+    "decimalPlaces":    1
+},
+{
     "name":         "currentProfileTakeOffSpeed",
     "shortDesc":    "Profile takeoff Speed",
     "type":         "double",
@@ -121,6 +131,16 @@
     "units":        "º",
     "min":          15.0,
     "max":          45.0,
+    "decimalPlaces":    1
+},
+{
+    "name":         "newProfileCableLength",
+    "shortDesc":    "Profile cable Length",
+    "type":         "double",
+    "default":      100.0,
+    "units":        "m",
+    "min":          50.0,
+    "max":          500.0,
     "decimalPlaces":    1
 },
 {

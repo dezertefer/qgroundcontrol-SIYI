@@ -16,6 +16,7 @@ class BackEnd : public QObject
     Q_PROPERTY(QGeoCoordinate A READ A WRITE setA NOTIFY AChanged)
     Q_PROPERTY(QGeoCoordinate B READ B WRITE setB NOTIFY BChanged)
     Q_PROPERTY(QGeoCoordinate C READ C WRITE setC NOTIFY CChanged)
+    Q_PROPERTY(QGeoCoordinate D READ D WRITE setD NOTIFY DChanged)
     Q_PROPERTY(double angle READ angle WRITE setAngle NOTIFY angleChanged)
     Q_PROPERTY(QString currentProfile  WRITE setCurrentProfile NOTIFY currentProfileChanged)
     Q_PROPERTY(QString newProfile WRITE setNewProfile NOTIFY newProfileChanged)
@@ -39,6 +40,7 @@ public:
     Q_INVOKABLE void changeLabel(int index, const QString &newLabel);
     Q_INVOKABLE void increaseCounter(int index);
     Q_INVOKABLE void changeRating(int index, int newRating);
+    //Q_INVOKABLE QGeoCoordinate d();
 
     void saveToFile();
     QString userName();
@@ -46,6 +48,7 @@ public:
     QGeoCoordinate A();
     QGeoCoordinate B();
     QGeoCoordinate C();
+    QGeoCoordinate D();
 
     void editProfile(const QString &profile);
     void setNewProfile(const QString &profile);
@@ -78,6 +81,8 @@ public:
 
     void setC(const QGeoCoordinate &newC);
 
+    void setD(const QGeoCoordinate &newD);
+
     QVariantMap profiles();
 
     QVariantList dropPoints();
@@ -94,6 +99,8 @@ signals:
     void BChanged();
 
     void CChanged();
+
+    void DChanged();
 
     void editProfileChanged();
 
@@ -122,6 +129,9 @@ private:
     QVariantList m_dropPoints;
 
     QStringList m_profileList;
+
+    double m_distance3D;
+    QGeoCoordinate m_D;
 };
 
 #endif // BACKEND_H

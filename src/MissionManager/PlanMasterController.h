@@ -55,6 +55,8 @@ public:
     /// Should be called immediately upon Component.onCompleted.
     Q_INVOKABLE void start(void);
 
+    Q_INVOKABLE QJsonDocument getJson();
+
     /// Starts the controller using a single static active vehicle. Will not track global active vehicle changes.
     ///     @param deleteWhenSendCmplete The PlanMasterController object should be deleted after the first send is completed.
     Q_INVOKABLE void startStaticActiveVehicle(Vehicle* vehicle, bool deleteWhenSendCompleted = false);

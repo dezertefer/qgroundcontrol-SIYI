@@ -25,19 +25,109 @@ BackEnd::BackEnd(QString path)
 
 QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
 {
-    QGeoCoordinate C;
+    // QGeoCoordinate C;
+    // double direction = A.azimuthTo(B);
+    // double Balt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble()-2.0;//B.altitude();
+    // double angle = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
+    // double distance = Balt/qTan(angle);
+    // double horizontalDistance = A.distanceTo(B);
+    // double altitudeDifference = B.altitude() - A.altitude() + 2.0;
+    // double distance3D = sqrt(pow(horizontalDistance, 2) + pow(altitudeDifference, 2));
+    // Balt += 2.0;
+    // if(distance3D < qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toDouble()){
+    //     C = A.atDistanceAndAzimuth(distance,direction,Balt);
+    //     m_C=C;
+    //     m_direction = distance;
+    //     m_distance3D = distance3D;
+    //     qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(Balt);
+    // }else{
+
+    // }
+
+    // //qgcApp()->toolbox()->settingsManager()->geoserverSettings()->visualEPSGNumber()->
+    // return C;
+    // //CreateJson();
+
+    // Get key settings and points
+    double cableLength = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toDouble();
+    double takeoffHoverAltitude = 2.0;  // F is A with altitude A.altitude() + 2m
+    //double Balt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble()-2.0;
+
+    // Compute initial desired point C using your initial angle logic.
+    double initialAngle = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
+    double initialAltitudeForC = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble();
+    double horizontalDistanceForC = (initialAltitudeForC - takeoffHoverAltitude) / qTan(initialAngle);
+    qDebug()<<"HORIZONTAL DISTANCE FOR C:"<< horizontalDistanceForC;
     double direction = A.azimuthTo(B);
-    double Balt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble()-2.0;//B.altitude();
-    double angle = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
-    double distance = Balt/qTan(angle);
-    Balt += 2.0;
-    C = A.atDistanceAndAzimuth(distance,direction,Balt);
-    m_C=C;
-    m_direction = distance;
-    qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(Balt);
-    //qgcApp()->toolbox()->settingsManager()->geoserverSettings()->visualEPSGNumber()->
-    return C;
-    //CreateJson();
+    QGeoCoordinate initialC = A.atDistanceAndAzimuth(horizontalDistanceForC, direction, initialAltitudeForC);
+
+    // Compute 3D distance from A to initialC.
+    double verticalDiff = initialC.altitude() - A.altitude() + 2;
+    double currentDistance3D = sqrt(pow(horizontalDistanceForC, 2) + pow(verticalDiff, 2));
+    QGeoCoordinate finalPoint;
+
+    qDebug()<<"CABLE:"<< cableLength;
+    qDebug()<<"3D DISTANCE:"<< currentDistance3D;
+    if(currentDistance3D < cableLength){
+            //double desiredVerticalDiff = B.altitude() - A.altitude()+2;
+            // Ensure the cable can cover the vertical difference.
+            // Calculate required horizontal distance so that the 3D distance equals the cable length.
+            double requiredHorizontalDistance = sqrt(cableLength * cableLength - (verticalDiff) * (verticalDiff));
+            qDebug()<<"requiredHorizontalDistance:"<< requiredHorizontalDistance;
+            finalPoint = A.atDistanceAndAzimuth(requiredHorizontalDistance, direction, initialAltitudeForC);
+            qDebug()<<"C LATITUDE:"<<initialC.latitude();
+            qDebug()<<"D LATITUDE:"<<finalPoint.latitude();
+            m_D = finalPoint;
+            m_C = finalPoint;
+            // In this case, finalPoint becomes both C and D.
+    }else{
+            double scaleFactor = cableLength / currentDistance3D;
+            double adjustedHorizontalDistance = horizontalDistanceForC * scaleFactor;
+            double adjustedAltitude = verticalDiff * scaleFactor; // this altitude will be lower than B's altitude.
+            finalPoint = A.atDistanceAndAzimuth(adjustedHorizontalDistance, direction, adjustedAltitude);
+            qDebug()<<"LATITUDE:"<<finalPoint.latitude();
+            m_D = finalPoint;
+            m_C = initialC;
+    }
+
+    // Check if point B is too close (e.g., perhaps the horizontal distance A->B is less than some minimum)
+    //double minRequiredDistance = cableLength;  // define based on your application
+
+
+    // Determine the final point (for both C and D)
+
+    // if (cableLength < currentDistance3D) {
+    //     // CASE 1: Cable is shorter than initial route A->C.
+    //     // Compute the reachable point along the same vector that exactly matches the cable length.
+    //     double scaleFactor = cableLength / currentDistance3D;
+    //     double adjustedHorizontalDistance = horizontalDistanceForC * scaleFactor;
+    //     double adjustedAltitude = A.altitude() + verticalDiff * scaleFactor; // this altitude will be lower than B's altitude.
+    //     finalPoint = A.atDistanceAndAzimuth(adjustedHorizontalDistance, direction, adjustedAltitude);
+    //     qDebug()<<"LATITUDE:"<<finalPoint.latitude();
+    //     m_D = finalPoint;
+    // } else {
+    //     // CASE 2: Cable is longer than initial A->C route.
+    //     // Sacrifice the initial angle and adjust so that final altitude equals B's altitude.
+
+    //     double desiredVerticalDiff = B.altitude() - A.altitude()+2;
+    //     // Ensure the cable can cover the vertical difference.
+    //     // Calculate required horizontal distance so that the 3D distance equals the cable length.
+    //     double requiredHorizontalDistance = sqrt(cableLength * cableLength - (desiredVerticalDiff) * (desiredVerticalDiff));
+    //     finalPoint = A.atDistanceAndAzimuth(requiredHorizontalDistance, direction, Balt);
+    //     qDebug()<<"LATITUDE:"<<finalPoint.latitude();
+    //     m_D = finalPoint;
+    //     // In this case, finalPoint becomes both C and D.
+    // }
+    //finalPoint = initialC;
+
+    // Save finalPoint as C and D.
+    //m_C = initialC;
+    m_direction = finalPoint.distanceTo(A);  // horizontal distance traveled
+    m_distance3D = cableLength;                // exactly the cable length used
+    qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(m_C.altitude());
+
+    // finalPoint is used for point D (and possibly C, if they match).
+    return m_C;
 }
 
 void BackEnd::CreateJson()
@@ -113,6 +203,11 @@ QGeoCoordinate BackEnd::C()
     return m_C;
 }
 
+QGeoCoordinate BackEnd::D()
+{
+    return m_D;
+}
+
 void BackEnd::setUserName(const QString &userName)
 {
     if (userName == m_userName)
@@ -155,6 +250,14 @@ void BackEnd::setC(const QGeoCoordinate &newC)
     emit CChanged();
 }
 
+void BackEnd::setD(const QGeoCoordinate &newD)
+{
+    if (m_D == newD)
+        return;
+    m_D = newD;
+    emit DChanged();
+}
+
 QVariantMap BackEnd::profiles()
 {
     return m_root_map;
@@ -191,6 +294,7 @@ void BackEnd::updateCurrentProfile (QString profile)
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->setRawValue(m_selectedProfile["speed"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->setRawValue(m_selectedProfile["angle"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->setRawValue(m_selectedProfile["takeOffSpeed"].toString());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->setRawValue(m_selectedProfile["cableLength"].toDouble());
 }
 
 void BackEnd::readJson ()
@@ -210,6 +314,7 @@ void BackEnd::readJson ()
         defaultProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawDefaultValue().toString());
         defaultProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawDefaultValue().toString());
         defaultProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawDefaultValue().toString());
+        defaultProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toString());
 
         profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawDefaultValue().toString(),defaultProfile);
 
@@ -220,6 +325,7 @@ void BackEnd::readJson ()
         defaultProfile.insert("alt","50");
         defaultProfile.insert("speed","6.9");
         defaultProfile.insert("takeOffSpeed","1.11");
+        defaultProfile.insert("cableLength", "70.0");
 
         profilesList.insert("Rapid Launcher", defaultProfile);
 
@@ -230,6 +336,7 @@ void BackEnd::readJson ()
         defaultProfile.insert("alt","60");
         defaultProfile.insert("speed","5.55");
         defaultProfile.insert("takeOffSpeed","1.11");
+        defaultProfile.insert("cableLength", "70.0");
 
         profilesList.insert("Winch", defaultProfile);
 
@@ -240,6 +347,7 @@ void BackEnd::readJson ()
         defaultProfile.insert("alt","60");
         defaultProfile.insert("speed","6.9");
         defaultProfile.insert("takeOffSpeed","1.67");
+        defaultProfile.insert("cableLength", "70.0");
 
         profilesList.insert("Direct off sand", defaultProfile);
 
@@ -250,6 +358,7 @@ void BackEnd::readJson ()
         defaultProfile.insert("alt","60");
         defaultProfile.insert("speed","5.55");
         defaultProfile.insert("takeOffSpeed","0.83");
+        defaultProfile.insert("cableLength", "70.0");
 
         profilesList.insert("Winch clipping traces", defaultProfile);
 
@@ -485,6 +594,7 @@ void BackEnd::editProfile (const QString &profile)
    currentProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toString());
    currentProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toString());
    currentProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toString());
+   currentProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toString());
 
    profilesList.insert(profile,currentProfile);
 
@@ -515,6 +625,7 @@ void BackEnd::setNewProfile(const QString &profile)
     newProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAlt()->rawValue().toString());
     newProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue().toString());
     newProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileTakeOffSpeed()->rawValue().toString());
+    newProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileCableLength()->rawValue().toString());
 
     //profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(),newProfile);
     m_root_map.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(), newProfile);
