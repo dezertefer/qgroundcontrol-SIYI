@@ -14,10 +14,8 @@ import QGroundControl               1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.Controls      1.0
 
-import QGroundControl.Controllers       1.0
-import QGroundControl.FactSystem        1.0
-
-
+import QGroundControl.Controllers   1.0
+import QGroundControl.FactSystem    1.0
 
 /// Use to drag a MissionItemIndicator
 Rectangle {
@@ -29,10 +27,7 @@ Rectangle {
     color:          "transparent"
     z:              QGroundControl.zOrderMapItems + 1    // Above item icons
 
-
-   // property var    _missionController:                 _planMasterController.missionController
-
-    // Properties which must be specific by consumer
+    // Properties which must be specified by consumer
     property var mapControl     ///< Map control which contains this item
     property var itemIndicator  ///< The mission item indicator to drag around
     property var itemCoordinate ///< Coordinate we are updating during drag
@@ -57,20 +52,17 @@ Rectangle {
     onXChanged: liveDrag()
     onYChanged: liveDrag()
 
-
-
-//    BackEnd {
-//    id: backend
-//    }
-
     function liveDrag() {
         if (!itemDragger._preventCoordinateBindingLoop && itemDrag.drag.active) {
-            var point = Qt.point(itemDragger.x + _touchMarginHorizontal + itemIndicator.anchorPoint.x, itemDragger.y + _touchMarginVertical + itemIndicator.anchorPoint.y)
+            var point = Qt.point(
+                itemDragger.x + _touchMarginHorizontal + (itemIndicator ? itemIndicator.anchorPoint.x : 0),
+                itemDragger.y + _touchMarginVertical   + (itemIndicator ? itemIndicator.anchorPoint.y : 0)
+            )
             var coordinate = mapControl.toCoordinate(point, false /* clipToViewPort */)
             itemDragger._preventCoordinateBindingLoop = true
-            //console.log(itemCoordinate.altitude)
-            coordinate.altitude = itemCoordinate.altitude
+            coordinate.altitude = itemCoordinate ? itemCoordinate.altitude : 0
             itemCoordinate = coordinate
+            globals.dragCoordinate = coordinate     // keep latest coord while dragging
             itemDragger._preventCoordinateBindingLoop = false
         }
     }
@@ -83,8 +75,9 @@ Rectangle {
         drag.target:        parent
         drag.minimumX:      0
         drag.minimumY:      0
-        drag.maximumX:      itemDragger.parent.width - parent.width
-        drag.maximumY:      itemDragger.parent.height - parent.height
+        // keep this guard to avoid "width of null"
+        drag.maximumX:      itemDragger.parent ? (itemDragger.parent.width  - parent.width)  : 0
+        drag.maximumY:      itemDragger.parent ? (itemDragger.parent.height - parent.height) : 0
         preventStealing:    true
         enabled:            itemDragger.visible
 
@@ -93,28 +86,39 @@ Rectangle {
             itemDragger.clicked()
         }
 
+        // >>> NEW: drive globals.dragActive only from mouse press/release <<<
+        onPressed: {
+            mouse.accepted = true
+            focus = true
+            if (!itemDragger._dragStartSignalled) {
+                itemDragger._dragStartSignalled = true
+                itemDragger.dragStart()
+            }
+            globals.dragActive = true
+        }
+
+        onPositionChanged: mouse.accepted = true
+
+        onReleased: {
+            mouse.accepted = true
+            itemDragger._dragStartSignalled = false
+            itemDragger.dragStop()
+            globals.dragActive = false
+            globals.dragCoordinate = itemCoordinate
+        }
+        // <<< END NEW >>>
+
+        // keep this only for internal visuals; DO NOT touch globals here
         property bool dragActive: drag.active
         onDragActiveChanged: {
             if (dragActive) {
                 focus = true
-                if (!_dragStartSignalled) {
-                    _dragStartSignalled = true
-                    dragStart()
+                if (!itemDragger._dragStartSignalled) {
+                    itemDragger._dragStartSignalled = true
+                    itemDragger.dragStart()
                 }
-            } else {
-                _dragStartSignalled = false
-                dragStop()
-                globals.planMasterControllerPlanView.missionController.removeVisualItem(3)
-                globals.planMasterControllerPlanView.missionController.removeVisualItem(3)
-                var vehicleCoordinate = globals.activeVehicle.coordinate
-                backend.A = vehicleCoordinate
-                backend.B = itemCoordinate
-                console.log(backend.angle)
-                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.D, 3, false)
-                globals.planMasterControllerPlanView.missionController.insertSimpleMissionItem(backend.C, 4, false)
-                globals.pointToAdd.lat = itemCoordinate.latitude
-                globals.pointToAdd.lon = itemCoordinate.longitude
             }
+            // intentionally no 'else' — prevents false releases on fast moves
         }
     }
 }

@@ -25,108 +25,47 @@ BackEnd::BackEnd(QString path)
 
 QGeoCoordinate BackEnd::calculateC(QGeoCoordinate &A, QGeoCoordinate &B)
 {
-    // QGeoCoordinate C;
-    // double direction = A.azimuthTo(B);
-    // double Balt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble()-2.0;//B.altitude();
-    // double angle = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
-    // double distance = Balt/qTan(angle);
-    // double horizontalDistance = A.distanceTo(B);
-    // double altitudeDifference = B.altitude() - A.altitude() + 2.0;
-    // double distance3D = sqrt(pow(horizontalDistance, 2) + pow(altitudeDifference, 2));
-    // Balt += 2.0;
-    // if(distance3D < qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toDouble()){
-    //     C = A.atDistanceAndAzimuth(distance,direction,Balt);
-    //     m_C=C;
-    //     m_direction = distance;
-    //     m_distance3D = distance3D;
-    //     qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(Balt);
-    // }else{
+    const double cableLen  = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toDouble();
+    const double angleRad  = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
+    const double profileRelAlt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble(); // meters above home
+    const double Aabs      = A.altitude();
+    const double Ahover    = Aabs + 2.0;                      // A′
+    const double desiredAbs= Aabs + profileRelAlt;            // C altitude (absolute MSL)
 
-    // }
+    const double dirAz     = A.azimuthTo(B);
 
-    // //qgcApp()->toolbox()->settingsManager()->geoserverSettings()->visualEPSGNumber()->
-    // return C;
-    // //CreateJson();
+    // vertical climb relative to A′ (never below 0)
+    double vertical = desiredAbs - Ahover;
+    if (vertical < 0) vertical = 0;
 
-    // Get key settings and points
-    double cableLength = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toDouble();
-    double takeoffHoverAltitude = 2.0;  // F is A with altitude A.altitude() + 2m
-    //double Balt = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble()-2.0;
+    // guard against 0 or tiny angle
+    const double eps = 1e-6;
+    const double horizForC = (std::abs(angleRad) < eps) ? 0.0 : (vertical / std::tan(angleRad));
 
-    // Compute initial desired point C using your initial angle logic.
-    double initialAngle = qDegreesToRadians(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toDouble());
-    double initialAltitudeForC = qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toDouble();
-    double horizontalDistanceForC = (initialAltitudeForC - takeoffHoverAltitude) / qTan(initialAngle);
-    qDebug()<<"HORIZONTAL DISTANCE FOR C:"<< horizontalDistanceForC;
-    double direction = A.azimuthTo(B);
-    QGeoCoordinate initialC = A.atDistanceAndAzimuth(horizontalDistanceForC, direction, initialAltitudeForC);
+    const double dist3D_C = std::sqrt(horizForC*horizForC + vertical*vertical);
 
-    // Compute 3D distance from A to initialC.
-    double verticalDiff = initialC.altitude() - A.altitude() + 2;
-    double currentDistance3D = sqrt(pow(horizontalDistanceForC, 2) + pow(verticalDiff, 2));
-    QGeoCoordinate finalPoint;
-
-    qDebug()<<"CABLE:"<< cableLength;
-    qDebug()<<"3D DISTANCE:"<< currentDistance3D;
-    if(currentDistance3D < cableLength){
-            //double desiredVerticalDiff = B.altitude() - A.altitude()+2;
-            // Ensure the cable can cover the vertical difference.
-            // Calculate required horizontal distance so that the 3D distance equals the cable length.
-            double requiredHorizontalDistance = sqrt(cableLength * cableLength - (verticalDiff) * (verticalDiff));
-            qDebug()<<"requiredHorizontalDistance:"<< requiredHorizontalDistance;
-            finalPoint = A.atDistanceAndAzimuth(requiredHorizontalDistance, direction, initialAltitudeForC);
-            qDebug()<<"C LATITUDE:"<<initialC.latitude();
-            qDebug()<<"D LATITUDE:"<<finalPoint.latitude();
-            m_D = finalPoint;
-            m_C = finalPoint;
-            // In this case, finalPoint becomes both C and D.
-    }else{
-            double scaleFactor = cableLength / currentDistance3D;
-            double adjustedHorizontalDistance = horizontalDistanceForC * scaleFactor;
-            double adjustedAltitude = verticalDiff * scaleFactor; // this altitude will be lower than B's altitude.
-            finalPoint = A.atDistanceAndAzimuth(adjustedHorizontalDistance, direction, adjustedAltitude);
-            qDebug()<<"LATITUDE:"<<finalPoint.latitude();
-            m_D = finalPoint;
-            m_C = initialC;
+    // Scale to cable limit if needed
+    double scale = 1.0;
+    if (dist3D_C > cableLen && dist3D_C > eps) {
+        scale = cableLen / dist3D_C;
     }
 
-    // Check if point B is too close (e.g., perhaps the horizontal distance A->B is less than some minimum)
-    //double minRequiredDistance = cableLength;  // define based on your application
+    const double horizD = horizForC * scale;
+    const double vertD  = vertical   * scale;
 
+    // Absolute altitudes (MSL) for C and D
+    QGeoCoordinate C = A.atDistanceAndAzimuth(horizForC, dirAz, Ahover + vertical);
+    QGeoCoordinate D = A.atDistanceAndAzimuth(horizD,  dirAz, Ahover + vertD);
 
-    // Determine the final point (for both C and D)
+    m_C = C;
+    m_D = D;
+    m_direction  = A.distanceTo(C);                 // horizontal A→C
+    m_distance3D = std::min(dist3D_C, cableLen);
 
-    // if (cableLength < currentDistance3D) {
-    //     // CASE 1: Cable is shorter than initial route A->C.
-    //     // Compute the reachable point along the same vector that exactly matches the cable length.
-    //     double scaleFactor = cableLength / currentDistance3D;
-    //     double adjustedHorizontalDistance = horizontalDistanceForC * scaleFactor;
-    //     double adjustedAltitude = A.altitude() + verticalDiff * scaleFactor; // this altitude will be lower than B's altitude.
-    //     finalPoint = A.atDistanceAndAzimuth(adjustedHorizontalDistance, direction, adjustedAltitude);
-    //     qDebug()<<"LATITUDE:"<<finalPoint.latitude();
-    //     m_D = finalPoint;
-    // } else {
-    //     // CASE 2: Cable is longer than initial A->C route.
-    //     // Sacrifice the initial angle and adjust so that final altitude equals B's altitude.
+    // Important: DON'T set defaultMissionItemAltitude to an absolute MSL!
+    // If you must set it, set to RELATIVE meters (profileRelAlt), not C.alt().
+    qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(profileRelAlt);
 
-    //     double desiredVerticalDiff = B.altitude() - A.altitude()+2;
-    //     // Ensure the cable can cover the vertical difference.
-    //     // Calculate required horizontal distance so that the 3D distance equals the cable length.
-    //     double requiredHorizontalDistance = sqrt(cableLength * cableLength - (desiredVerticalDiff) * (desiredVerticalDiff));
-    //     finalPoint = A.atDistanceAndAzimuth(requiredHorizontalDistance, direction, Balt);
-    //     qDebug()<<"LATITUDE:"<<finalPoint.latitude();
-    //     m_D = finalPoint;
-    //     // In this case, finalPoint becomes both C and D.
-    // }
-    //finalPoint = initialC;
-
-    // Save finalPoint as C and D.
-    //m_C = initialC;
-    m_direction = finalPoint.distanceTo(A);  // horizontal distance traveled
-    m_distance3D = cableLength;                // exactly the cable length used
-    qgcApp()->toolbox()->settingsManager()->appSettings()->defaultMissionItemAltitude()->setRawValue(m_C.altitude());
-
-    // finalPoint is used for point D (and possibly C, if they match).
     return m_C;
 }
 

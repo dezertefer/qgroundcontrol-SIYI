@@ -73,6 +73,84 @@ Item {
     readonly property int       _layerRallyPoints:          3
     readonly property string    _armedVehicleUploadPrompt:  qsTr("Vehicle is currently armed. Do you want to upload the mission to the vehicle?")
 
+    property var _pendingCoord: null
+
+    property bool enableDebug: false
+
+    property real _takeoffRel: 2.0
+
+    function _minHaulAltRel() {
+        var angleDeg = Number(_planViewSettings.currentProfileAngle.rawValue) || 0
+        var L        = Number(_planViewSettings.currentProfileCableLength.rawValue) || 0
+        var theta    = angleDeg * Math.PI / 180.0
+        return _takeoffRel + Math.max(0, L * Math.sin(theta)) + 10
+    }
+
+    // Clamp the Fact if it's too low
+    function _enforceHaulAltitudeMin(showToast) {
+        var minAlt = _minHaulAltRel()
+        var curAlt = Number(_planViewSettings.currentProfileAlt.rawValue) || 0
+        if (curAlt < minAlt) {
+            _planViewSettings.currentProfileAlt.rawValue = minAlt
+            if (showToast) {
+                mainWindow.showMessageDialog(
+                    qsTr("Profile constraint"),
+                    qsTr("Haul altitude was raised to %1 m (minimum for %2 m cable @ %3°).")
+                        .arg(minAlt.toFixed(1))
+                        .arg(Number(_planViewSettings.currentProfileCableLength.rawValue).toFixed(1))
+                        .arg(Number(_planViewSettings.currentProfileAngle.rawValue).toFixed(0))
+                )
+            }
+        }
+    }
+
+    Connections {
+        target: _planViewSettings.currentProfileAlt
+        function onRawValueChanged() { _enforceHaulAltitudeMin(false) }
+    }
+    Connections {
+        target: _planViewSettings.currentProfileAngle
+        function onRawValueChanged() { _enforceHaulAltitudeMin(true) }
+    }
+    Connections {
+        target: _planViewSettings.currentProfileCableLength
+        function onRawValueChanged() { _enforceHaulAltitudeMin(true) }
+    }
+    Component.onCompleted: _enforceHaulAltitudeMin(false)
+
+    Timer {
+        id: rebuildPollTimer
+        interval: 300
+        repeat: true
+        running: false
+        onTriggered: {
+            // Rebuild once the model is truly empty (some builds keep a home visual, so <= 1)
+            if (!_missionController.containsItems || _missionController.visualItems.count <= 1) {
+                rebuildPollTimer.stop()
+                if (_pendingCoord) {
+                    backend.dropPointSelected = false
+                    insertSimpleItemAfterCurrent(_pendingCoord)   // your existing builder, unchanged
+                    _pendingCoord = null
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: globals
+        function onDragActiveChanged() {
+            // Only act when drag just ended
+            if (!globals.dragActive && globals.dragCoordinate) {
+                _pendingCoord = globals.dragCoordinate
+                // Clear asynchronously
+                _planMasterController.removeAllFromVehicle()
+                _missionController.setCurrentPlanViewSeqNum(0, true)
+                // Start polling until empty, then rebuild
+                rebuildPollTimer.start()
+            }
+        }
+    }
+
     function mapCenter() {
         var coordinate = editorMap.center
         coordinate.latitude  = coordinate.latitude.toFixed(_decimalPlaces)
@@ -333,52 +411,143 @@ Item {
 
     }
 
+    // function insertSimpleItemAfterCurrent(targetCoord) {
+    //     // Clear existing plan if anything is already there
+    //     if (_missionController.containsItems) {
+    //         _planMasterController.removeAllFromVehicle()
+    //         _missionController.setCurrentPlanViewSeqNum(0, true)
+    //     }
+
+    //     // A = current vehicle position, B = user click
+    //     const A = globals.activeVehicle.coordinate
+    //     backend.A = A
+    //     backend.B = targetCoord
+
+    //     // Force backend to compute C/D (side-effect inside getter)
+    //     void backend.angle
+
+    //     // Convert absolute (MSL) -> relative (home) for mission items
+    //     function toRelative(c) {
+    //         const home = globals.activeVehicle.homePosition   // MSL
+    //         return QtPositioning.coordinate(c.latitude, c.longitude, c.altitude - home.altitude)
+    //     }
+
+    //     let idx = 1
+
+    //     // 1) Takeoff at A (QGC uses relative alt by default for simple items)
+    //     _missionController.insertTakeoffItem(A, idx++, true)
+
+    //     // 2) Climb/translate to C
+    //     _missionController.insertSimpleMissionItem(toRelative(backend.C), idx++, true)
+
+    //     // 3) If cable-limited, go to D (skip if C==D)
+    //     if (backend.D.latitude  !== backend.C.latitude  ||
+    //         backend.D.longitude !== backend.C.longitude ||
+    //         backend.D.altitude  !== backend.C.altitude) {
+    //         _missionController.insertSimpleMissionItem(toRelative(backend.D), idx++, true)
+    //     }
+
+    //     // 4) Go to the user-selected target (B)
+    //     _missionController.insertSimpleMissionItem(toRelative(targetCoord), idx++, true)
+
+    //     // 5) DO_SERVO for the drop (keep your helper; if possible, make it command-only)
+    //     _missionController.insertSimpleMissionItemServo(targetCoord, idx++, false)
+
+    //     // 6) Land back at A (or change to a different LZ if you have one)
+    //     _missionController.insertLandItem(A, idx++, false)
+
+    //     backend.dropPointSelected = true
+
+    //     console.log(_planMasterController.getJson())
+    // }
+
+
     function insertSimpleItemAfterCurrent(coordinate) {
-        console.log(backend.dropPointSelected)
-        //console.log("RemoveAllFromVehicle")
-        //_planMasterController.removeAllFromVehicle()
-        //_missionController.setCurrentPlanViewSeqNum(0, true)
-        //_planController.removeAllFromVehicle()
-        //console.log(backend.dropPointSelected)
-        //_missionController.insertTakeoffItem(globals.activeVehicle.coordinate, 1, true /* makeCurrentItem */)
-        //_missionController.containsItems
-        if (!backend.dropPointSelected && _missionController.currentPlanViewVIIndex ===0 && _missionController.currentPlanViewSeqNum ===0 && !_missionController.containsItems)
-        {
-        var vehicleCoordinate = globals.activeVehicle.coordinate
-        backend.A = vehicleCoordinate
-        backend.B = coordinate
-        console.log(backend.angle)
-        console.log(backend.C)
-        console.log(QGroundControl.settingsManager.appSettings.defaultMissionItemAltitude.rawValue)
-        console.log(_missionController.hasPosition)
-        console.log(_missionController.currentPlanViewVIIndex)
-        console.log(_missionController.currentPlanViewSeqNum)
-        var dCoordinate = backend.D
-        //console.log(_missionController.)
-        var nextIndex = _missionController.currentPlanViewVIIndex + 1
-        _missionController.insertTakeoffItem(globals.activeVehicle.coordinate, nextIndex, true /* makeCurrentItem */)
-        nextIndex += 1
-        //_missionController.insertSimpleMissionItem(globals.activeVehicle.coordinate, nextIndex, false /* makeCurrentItem */)
-        //nextIndex += 1
-        _missionController.insertSimpleMissionItem(globals.activeVehicle.coordinate, nextIndex, false /* makeCurrentItem */)
-        nextIndex += 1
-        _missionController.insertSimpleMissionItem(backend.D, nextIndex, true /* makeCurrentItem */)
+        // identical guard to your stock code
+        if (!backend.dropPointSelected
+            && _missionController.currentPlanViewVIIndex === 0
+            && _missionController.currentPlanViewSeqNum === 0
+            && !_missionController.containsItems) {
 
-        nextIndex += 1
-        _missionController.insertSimpleMissionItem(backend.C, nextIndex, true /* makeCurrentItem */)
+            var vehicleCoordinate = globals.activeVehicle.coordinate
 
+            // Feed A/B and compute C/D (backend sets lat/lon; we'll set REL altitudes here)
+            backend.A = vehicleCoordinate
+            backend.B = coordinate
+            void backend.angle
 
-        nextIndex += 1
-        _missionController.insertSimpleMissionItem(coordinate, nextIndex, true /* makeCurrentItem */)
-        //pointToAdd.label = "Point"
-        globals.pointToAdd.lat = coordinate.latitude
-        globals.pointToAdd.lon = coordinate.longitude
-        nextIndex += 1
-        _missionController.insertSimpleMissionItemServo(coordinate, nextIndex, false /* makeCurrentItem */)
-        nextIndex += 1
-        _missionController.insertLandItem(vehicleCoordinate, nextIndex, false)
-        backend.dropPointSelected = true
-        }else{
+            // ---- profile (REL) ----
+            var takeoffRel = 2.0
+            var haulRel    = Number(_planViewSettings.currentProfileAlt.rawValue) || 0
+            var L          = Number(_planViewSettings.currentProfileCableLength.rawValue) || 0
+            var angleDeg   = Number(_planViewSettings.currentProfileAngle.rawValue) || 0
+            var theta      = angleDeg * Math.PI / 180
+
+            // D altitude (REL): 2 m + L·sin(theta), clamped to haul
+            var dAltRel = Math.min(haulRel, takeoffRel + (L > 0 ? L * Math.sin(theta) : 0))
+
+            // helpers
+            function _setLastItemAltRel(relAlt) {
+                var n = _missionController.visualItems.count
+                if (!n) return
+                var vi = _missionController.visualItems.get(n - 1)
+                try {
+                    if (vi.hasOwnProperty("altitudeMode")) {
+                        vi.altitudeMode = QGroundControl.AltitudeModeRelative
+                    }
+                    if (vi.altitude && vi.altitude.hasOwnProperty("rawValue")) {
+                        vi.altitude.rawValue = relAlt
+                    }
+                } catch (e) { console.log("setLastItemAltRel failed:", e) }
+            }
+            function coordsAlmostEqual(c1, c2) {
+                if (!c1 || !c2) return false
+                var mPerDeg = 111320
+                var dLat = (c1.latitude - c2.latitude) * mPerDeg
+                var meanLatRad = ((c1.latitude + c2.latitude) * 0.5) * Math.PI / 180
+                var dLon = (c1.longitude - c2.longitude) * mPerDeg * Math.cos(meanLatRad)
+                var horiz = Math.sqrt(dLat*dLat + dLon*dLon)
+                var dAlt = Math.abs((c1.altitude||0) - (c2.altitude||0))
+                return horiz < 0.5 && dAlt < 0.5
+            }
+            // uses your existing toRelative(c)
+
+            var nextIndex = 1
+
+            // (1) TAKEOFF @ A (2 m)
+            _missionController.insertTakeoffItem(vehicleCoordinate, nextIndex++, true)
+            _setLastItemAltRel(takeoffRel)
+
+            // (2) WP @ A (placeholder) -> worker sets slow/takeoff speed here (index 2)
+            _missionController.insertSimpleMissionItem(vehicleCoordinate, nextIndex++, true)
+            // worker also sets 3 m here; that's fine, we leave it
+
+            // (3) D (cable-end) -> worker switches to haul speed here (index 3)
+            _missionController.insertSimpleMissionItem(toRelative(backend.D), nextIndex++, true)
+            _setLastItemAltRel(dAltRel)  // ensure correct REL altitude at cable end
+
+            // (4) C (haul altitude), only if meaningfully different from D
+            if (!coordsAlmostEqual(backend.D, backend.C)) {
+                _missionController.insertSimpleMissionItem(toRelative(backend.C), nextIndex++, true)
+                _setLastItemAltRel(haulRel)
+            }
+
+            // (5) B (drop point) at haul altitude
+            _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
+            _setLastItemAltRel(haulRel)
+
+            // (6) DO_SET_SERVO
+            _missionController.insertSimpleMissionItemServo(coordinate, nextIndex++, false)
+
+            // (7) LAND back at A
+            _missionController.insertLandItem(vehicleCoordinate, nextIndex++, false)
+
+            // bookkeeping
+            globals.pointToAdd.lat = coordinate.latitude
+            globals.pointToAdd.lon = coordinate.longitude
+            backend.dropPointSelected = true
+
+        } else {
             _planMasterController.removeAllFromVehicle()
             _missionController.setCurrentPlanViewSeqNum(0, true)
             backend.dropPointSelected = false
@@ -386,7 +555,24 @@ Item {
         }
 
         console.log(_planMasterController.getJson())
+    }
 
+
+    // function rebuildDropPlan(newTargetCoord) {
+    //     // Clear current plan
+    //     _planMasterController.removeAllFromVehicle()
+    //     _missionController.setCurrentPlanViewSeqNum(0, true)
+
+    //     // Reset whatever flags you use
+    //     if (backend.dropPointSelected) backend.dropPointSelected = false
+
+    //     // Rebuild from scratch using your existing builder
+    //     insertSimpleItemAfterCurrent(newTargetCoord)
+    // }
+
+    function toRelative(c) {
+        const homeAlt = globals.activeVehicle.homePosition.altitude; // MSL
+        return QtPositioning.coordinate(c.latitude, c.longitude, c.altitude - homeAlt);
     }
 
     function insertROIAfterCurrent(coordinate) {
@@ -899,7 +1085,7 @@ Item {
             anchors.bottom:     parent.bottom
             anchors.right:      parent.right
             anchors.rightMargin: _toolsMargin
-            visible: false//true
+            visible: enableDebug//true
         }
         //-------------------------------------------------------
         // Right Panel Controls
@@ -931,7 +1117,7 @@ Item {
                     height:     planControlColapsed ? colapsedRow.height + ScreenTools.defaultFontPixelHeight : 0
                     color:      qgcPal.missionItemEditor
                     radius:     _radius
-                    visible:    planControlColapsed && _airspaceEnabled
+                    visible:    enableDebug ? planControlColapsed && _airspaceEnabled : false
                     Row {
                         id:                     colapsedRow
                         spacing:                ScreenTools.defaultFontPixelWidth
@@ -976,7 +1162,7 @@ Item {
                 QGCTabBar {
                     id:         layerTabBar
                     width:      parent.width
-                    visible:    false//(!planControlColapsed || !_airspaceEnabled) && QGroundControl.corePlugin.options.enablePlanViewSelector
+                    visible:    enableDebug ? ((!planControlColapsed || !_airspaceEnabled) && QGroundControl.corePlugin.options.enablePlanViewSelector) : false
                     Component.onCompleted: currentIndex = 0
                     QGCTabButton {
                         text:       qsTr("Mission")
@@ -995,14 +1181,14 @@ Item {
             // Mission Item Editor
             Item {
                 id:                     missionItemEditor
-                //anchors.left:           parent.left
+                anchors.left:           parent.left
                 width: 1
                 anchors.right:          parent.right
                 anchors.top:            rightControls.bottom
                 anchors.topMargin:      ScreenTools.defaultFontPixelHeight * 0.25
                 anchors.bottom:         parent.bottom
                 anchors.bottomMargin:   ScreenTools.defaultFontPixelHeight * 0.25
-                visible:                false//_editingLayer == _layerMission && !planControlColapsed
+                visible:                _editingLayer == _layerMission && !planControlColapsed
                 QGCListView {
                     id:                 missionItemEditorListView
                     anchors.fill:       parent
@@ -1013,13 +1199,13 @@ Item {
                     clip:               true
                     currentIndex:       _missionController.currentPlanViewSeqNum
                     highlightMoveDuration: 250
-                    visible:            _editingLayer == _layerMission && !planControlColapsed
+                    visible:            enableDebug ? _editingLayer == _layerMission && !planControlColapsed : false
                     //-- List Elements
                     delegate: MissionItemEditor {
                         map:            editorMap
                         masterController:  _planMasterController
                         missionItem:    object
-                        width:          1//parent.width
+                        width:          enableDebug ? parent.width : 1
                         readOnly:       false
                         onClicked:      _missionController.setCurrentPlanViewSeqNum(object.sequenceNumber, false)
                         onRemove: {
@@ -1416,7 +1602,7 @@ Item {
 
                 QGCLabel
                 {
-                text: qsTr("Cable length:")
+                text: qsTr("Backbone:")
                 }
                 FactTextField
                 {
@@ -1487,43 +1673,43 @@ Item {
 
 
 
-               /* QGCButton {
-                    text:               qsTr("Open...")
-                    Layout.fillWidth:   true
-                    enabled:            !_planMasterController.syncInProgress
-                    onClicked: {
-                        dropPanel.hide()
-                        if (_planMasterController.dirty) {
-                            mainWindow.showComponentDialog(syncLoadFromFileOverwrite, columnHolder._overwriteText, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                        } else {
-                            _planMasterController.loadFromSelectedFile()
-                        }
-                    }
-                }
+                // QGCButton {
+                //     text:               qsTr("Open...")
+                //     Layout.fillWidth:   true
+                //     enabled:            !_planMasterController.syncInProgress
+                //     onClicked: {
+                //         dropPanel.hide()
+                //         if (_planMasterController.dirty) {
+                //             mainWindow.showComponentDialog(syncLoadFromFileOverwrite, columnHolder._overwriteText, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
+                //         } else {
+                //             _planMasterController.loadFromSelectedFile()
+                //         }
+                //     }
+                // }
 
-                QGCButton {
-                    text:               qsTr("Save")
-                    Layout.fillWidth:   true
-                    enabled:            !_planMasterController.syncInProgress && _planMasterController.currentPlanFile !== ""
-                    onClicked: {
-                        dropPanel.hide()
-                        if(_planMasterController.currentPlanFile !== "") {
-                            _planMasterController.saveToCurrent()
-                        } else {
-                            _planMasterController.saveToSelectedFile()
-                        }
-                    }
-                }
+                // QGCButton {
+                //     text:               qsTr("Save")
+                //     Layout.fillWidth:   true
+                //     enabled:            !_planMasterController.syncInProgress && _planMasterController.currentPlanFile !== ""
+                //     onClicked: {
+                //         dropPanel.hide()
+                //         if(_planMasterController.currentPlanFile !== "") {
+                //             _planMasterController.saveToCurrent()
+                //         } else {
+                //             _planMasterController.saveToSelectedFile()
+                //         }
+                //     }
+                // }
 
-                QGCButton {
-                    text:               qsTr("Save As...")
-                    Layout.fillWidth:   true
-                    enabled:            !_planMasterController.syncInProgress && _planMasterController.containsItems
-                    onClicked: {
-                        dropPanel.hide()
-                        _planMasterController.saveToSelectedFile()
-                    }
-                }*/
+                // QGCButton {
+                //     text:               qsTr("Save As...")
+                //     Layout.fillWidth:   true
+                //     enabled:            !_planMasterController.syncInProgress && _planMasterController.containsItems
+                //     onClicked: {
+                //         dropPanel.hide()
+                //         _planMasterController.saveToSelectedFile()
+                //     }
+                // }
 
 
             }

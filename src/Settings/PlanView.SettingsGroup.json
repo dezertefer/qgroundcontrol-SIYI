@@ -81,10 +81,10 @@
     "name":         "currentProfileCableLength",
     "shortDesc":    "Profile cable Length",
     "type":         "double",
-    "default":      100.0,
+    "default":      20.0,
     "units":        "m",
-    "min":          50.0,
-    "max":          500.0,
+    "min":          20.0,
+    "max":          100.0,
     "decimalPlaces":    1
 },
 {
@@ -137,10 +137,10 @@
     "name":         "newProfileCableLength",
     "shortDesc":    "Profile cable Length",
     "type":         "double",
-    "default":      100.0,
+    "default":      20.0,
     "units":        "m",
-    "min":          50.0,
-    "max":          500.0,
+    "min":          20.0,
+    "max":          100.0,
     "decimalPlaces":    1
 },
 {

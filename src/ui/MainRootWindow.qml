@@ -89,6 +89,8 @@ ApplicationWindow {
 
         property var                planMasterControllerPlanView:   null
         property var                currentPlanMissionItem:         planMasterControllerPlanView ? planMasterControllerPlanView.missionController.currentPlanViewItem : null
+        property bool               dragActive:                     false
+        property var                dragCoordinate
     }
 
     BackEnd {
