@@ -112,6 +112,7 @@ public:
     void            setFirmwareType     (MAV_AUTOPILOT autopilot)                       { _firmwareType = autopilot; }
     void            setSendStatusText   (bool sendStatusText)                           { _sendStatusText = sendStatusText; }
     void            setFailureMode      (MockConfiguration::FailureMode_t failureMode)  { _failureMode = failureMode; }
+    void            _sendServoOutputRaw (uint16_t servo9);
 
     /// APM stack has strange handling of the first item of the mission list. If it has no
     /// onboard mission items, sometimes it sends back a home position in position 0 and
@@ -319,5 +320,9 @@ private:
     static double       _defaultVehicleAltitude;
     static int          _nextVehicleSystemId;
     static const char*  _failParam;
+
+    uint16_t _servo9Pwm = 1200;
+    bool    _servo9Increasing = true;
+    int     _servo9Counter = 0;
 };
 

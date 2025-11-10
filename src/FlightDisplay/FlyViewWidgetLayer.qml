@@ -106,18 +106,18 @@ Item {
         visible:            !multiVehiclePanelSelector.showSingleVehiclePanel
     }
 
-    FlyViewInstrumentPanel {
-        id:                         instrumentPanel
-        anchors.margins:            _toolsMargin
-        anchors.top:                multiVehiclePanelSelector.visible ? multiVehiclePanelSelector.bottom : parent.top
-        anchors.right:              parent.right
-        width:                      _rightPanelWidth
-        spacing:                    _toolsMargin
-        visible:                    QGroundControl.corePlugin.options.flyView.showInstrumentPanel && multiVehiclePanelSelector.showSingleVehiclePanel
-        availableHeight:            parent.height - y - _toolsMargin
+    // FlyViewInstrumentPanel {
+    //     id:                         instrumentPanel
+    //     anchors.margins:            _toolsMargin
+    //     anchors.top:                multiVehiclePanelSelector.visible ? multiVehiclePanelSelector.bottom : parent.top
+    //     anchors.right:              parent.right
+    //     width:                      _rightPanelWidth
+    //     spacing:                    _toolsMargin
+    //     visible:                    QGroundControl.corePlugin.options.flyView.showInstrumentPanel && multiVehiclePanelSelector.showSingleVehiclePanel
+    //     availableHeight:            parent.height - y - _toolsMargin
 
-        property real rightInset: visible ? parent.width - x : 0
-    }
+    //     property real rightInset: visible ? parent.width - x : 0
+    // }
 
     // PhotoVideoControl {
     //     id:                     photoVideoControl
@@ -170,33 +170,33 @@ Item {
                     target: telemetryPanel
                     x: recalcXPosition()
                 }
-            },
-
-            State {
-                name: "right-video"
-                when: !telemetryPanel.bottomMode && photoVideoControl.visible
-
-                AnchorChanges {
-                    target: telemetryPanel
-                    anchors.top: photoVideoControl.bottom
-                    anchors.bottom: undefined
-                    anchors.right: parent.right
-                    anchors.verticalCenter: undefined
-                }
-            },
-
-            State {
-                name: "right-novideo"
-                when: !telemetryPanel.bottomMode && !photoVideoControl.visible
-
-                AnchorChanges {
-                    target: telemetryPanel
-                    anchors.top: undefined
-                    anchors.bottom: undefined
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                }
             }
+
+            // State {
+            //     name: "right-video"
+            //     when: !telemetryPanel.bottomMode && photoVideoControl.visible
+
+            //     AnchorChanges {
+            //         target: telemetryPanel
+            //         anchors.top: photoVideoControl.bottom
+            //         anchors.bottom: undefined
+            //         anchors.right: parent.right
+            //         anchors.verticalCenter: undefined
+            //     }
+            // },
+
+            // State {
+            //     name: "right-novideo"
+            //     when: !telemetryPanel.bottomMode && !photoVideoControl.visible
+
+            //     AnchorChanges {
+            //         target: telemetryPanel
+            //         anchors.top: undefined
+            //         anchors.bottom: undefined
+            //         anchors.right: parent.right
+            //         anchors.verticalCenter: parent.verticalCenter
+            //     }
+            // }
         ]
 
         function recalcXPosition() {

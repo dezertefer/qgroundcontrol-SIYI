@@ -265,6 +265,15 @@ void MockLink::_run10HzTasks(void)
             _sendGpsRawInt();
         }
     }
+
+    if (_firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+        if (++_servo9Counter >= 50) {
+            _servo9Counter = 0;
+            _servo9Increasing = !_servo9Increasing;
+            _servo9Pwm = _servo9Increasing ? 1900 : 1200;
+        }
+        _sendServoOutputRaw(_servo9Pwm);
+    }
 }
 
 void MockLink::_run500HzTasks(void)
@@ -1740,4 +1749,21 @@ void MockLink::simulateConnectionRemoved(void)
 {
     _commLost = true;
     _connectionRemoved();
+}
+
+void MockLink::_sendServoOutputRaw(uint16_t servo9)
+{
+    mavlink_servo_output_raw_t pkt{};
+    pkt.time_usec = QDateTime::currentMSecsSinceEpoch() * 1000ULL;
+    pkt.port = 0;
+    pkt.servo1_raw = 1500;
+    pkt.servo9_raw = servo9;
+
+    mavlink_message_t msg;
+    mavlink_msg_servo_output_raw_encode_chan(
+        _vehicleSystemId,
+        _vehicleComponentId,
+        mavlinkAuxChannel(),
+        &msg, &pkt);
+    respondWithMavlinkMessage(msg);
 }

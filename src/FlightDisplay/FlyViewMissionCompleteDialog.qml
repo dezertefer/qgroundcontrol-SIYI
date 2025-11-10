@@ -42,7 +42,10 @@ Item {
             _vehicleWasInMissionFlightMode = _vehicleInMissionFlightMode
         } else {
             if (_showMissionCompleteDialog) {
-                mainWindow.showComponentDialog(missionCompleteDialogComponent, qsTr("Flight Plan complete"), mainWindow.showDialogDefaultWidth, StandardButton.Close)
+                _planController.removeAllFromVehicle()
+                backend.dropPointSelected = false
+                //hideDialog()
+                //mainWindow.showComponentDialog(missionCompleteDialogComponent, qsTr("Flight Plan complete"), mainWindow.showDialogDefaultWidth, StandardButton.Close)
             }
             _vehicleWasArmed = false
             _vehicleWasInMissionFlightMode = false

@@ -25,7 +25,7 @@ APMCopterMode::APMCopterMode(uint32_t mode, bool settable) :
     setEnumToStringMapping({
         { STABILIZE,    "Stabilize"},
         { ACRO,         "Acro"},
-        { ALT_HOLD,     "Altitude Hold"},
+        { ALT_HOLD,     "Altitude"},
         { AUTO,         "Auto"},
         { GUIDED,       "Guided"},
         { LOITER,       "Loiter"},
@@ -36,7 +36,7 @@ APMCopterMode::APMCopterMode(uint32_t mode, bool settable) :
         { SPORT,        "Sport"},
         { FLIP,         "Flip"},
         { AUTOTUNE,     "Autotune"},
-        { POS_HOLD,     "Position Hold"},
+        { POS_HOLD,     "Position"},
         { BRAKE,        "Brake"},
         { THROW,        "Throw"},
         { AVOID_ADSB,   "Avoid ADSB"},

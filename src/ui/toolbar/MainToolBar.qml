@@ -111,9 +111,9 @@ Rectangle {
     //-- Branding Logo
     Image {
         anchors.right:          parent.right
-        anchors.top:            parent.top
-        anchors.bottom:         parent.bottom
+        height:                 parent.height*0.8
         anchors.margins:        ScreenTools.defaultFontPixelHeight * 0.66
+        anchors.verticalCenter: parent.verticalCenter
         visible:                currentToolbar !== planViewToolbar && _activeVehicle && !_communicationLost && x > (toolsFlickable.x + toolsFlickable.contentWidth + ScreenTools.defaultFontPixelWidth)
         fillMode:               Image.PreserveAspectFit
         source:                 _outdoorPalette ? _brandImageOutdoor : _brandImageIndoor

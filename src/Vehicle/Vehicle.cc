@@ -109,6 +109,7 @@ const char* Vehicle::_localPositionSetpointFactGroupName ="localPositionSetpoint
 const char* Vehicle::_escStatusFactGroupName =          "escStatus";
 const char* Vehicle::_estimatorStatusFactGroupName =    "estimatorStatus";
 const char* Vehicle::_terrainFactGroupName =            "terrain";
+const char* Vehicle::_actuatorOutputsFactGroupName = "actuatorsRaw";
 const char* Vehicle::_hygrometerFactGroupName =         "hygrometer";
 
 // Standard connected vehicle
@@ -170,6 +171,7 @@ Vehicle::Vehicle(LinkInterface*             link,
     , _estimatorStatusFactGroup     (this)
     , _hygrometerFactGroup          (this)
     , _terrainFactGroup             (this)
+    , _actuatorOutputsFactGroup  (this)
     , _terrainProtocolHandler       (new TerrainProtocolHandler(this, &_terrainFactGroup, this))
 {
     _linkManager = _toolbox->linkManager();
@@ -194,6 +196,8 @@ Vehicle::Vehicle(LinkInterface*             link,
     connect(this, &Vehicle::remoteControlRSSIChanged,   this, &Vehicle::_remoteControlRSSIChanged);
 
     _commonInit();
+
+
 
     _vehicleLinkManager->_addLink(link);
 
@@ -449,6 +453,8 @@ void Vehicle::_commonInit()
     _addFactGroup(&_estimatorStatusFactGroup,   _estimatorStatusFactGroupName);
     _addFactGroup(&_hygrometerFactGroup,        _hygrometerFactGroupName);
     _addFactGroup(&_terrainFactGroup,           _terrainFactGroupName);
+    _addFactGroup(&_actuatorOutputsFactGroup,   _actuatorOutputsFactGroupName);
+
 
     // Add firmware-specific fact groups, if provided
     QMap<QString, FactGroup*>* fwFactGroups = _firmwarePlugin->factGroups();
@@ -711,7 +717,32 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         break;
     case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
         _handleGlobalPositionInt(message);
+    case MAVLINK_MSG_ID_SERVO_OUTPUT_RAW: {
+        mavlink_servo_output_raw_t s{};
+        mavlink_msg_servo_output_raw_decode(&message, &s);
+
+        const int base = (int(s.port) * 8);      // 0 -> ch 1..8, 1 -> ch 9..16
+        if (base != 0 && base != 8) break;       // ignore any weird ports
+
+        const uint16_t vv[8] = {
+            s.servo1_raw, s.servo2_raw, s.servo3_raw, s.servo4_raw,
+            s.servo5_raw, s.servo6_raw, s.servo7_raw, s.servo8_raw
+        };
+
+        for (int i = 0; i < 8; ++i) {
+            const int ch = base + i + 1;         // 1..16
+            uint16_t pwm = vv[i];
+
+            // ArduPilot uses 0 for “unused”. Extensions/Garbage often show big numbers/0xFFFF.
+            if (pwm < 800 || pwm > 2200 || pwm == 0xFFFF)
+            {
+                pwm = 0;
+            }
+
+            _actuatorOutputsFactGroup.setPwm(ch, pwm);
+        }
         break;
+    }
     case MAVLINK_MSG_ID_ALTITUDE:
         _handleAltitude(message);
         break;

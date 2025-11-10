@@ -32,41 +32,42 @@ Rectangle {
         anchors.margins:    _toolsMargin
         anchors.bottom:     parent.bottom
         anchors.left:       parent.left
+        //anchors.right:      parent.right
 
          RowLayout {
             visible: mouseArea.containsMouse || valueArea.settingsUnlocked
 
-            QGCColoredImage {
-                source:             "/res/layout-bottom.svg"
-                mipmap:             true
-                width:              ScreenTools.minTouchPixels * 0.75
-                height:             width
-                sourceSize.width:   width
-                color:              qgcPal.text
-                fillMode:           Image.PreserveAspectFit
-                visible:            !bottomMode
+            // QGCColoredImage {
+            //     source:             "/res/layout-bottom.svg"
+            //     mipmap:             true
+            //     width:              ScreenTools.minTouchPixels * 0.75
+            //     height:             width
+            //     sourceSize.width:   width
+            //     color:              qgcPal.text
+            //     fillMode:           Image.PreserveAspectFit
+            //     visible:            !bottomMode
 
-                QGCMouseArea {
-                    fillItem:   parent
-                    onClicked:  bottomMode = true
-                }
-            }
+            //     QGCMouseArea {
+            //         fillItem:   parent
+            //         onClicked:  bottomMode = true
+            //     }
+            // }
 
-            QGCColoredImage {
-                source:             "/res/layout-right.svg"
-                mipmap:             true
-                width:              ScreenTools.minTouchPixels * 0.75
-                height:             width
-                sourceSize.width:   width
-                color:              qgcPal.text
-                fillMode:           Image.PreserveAspectFit
-                visible:            bottomMode
+            // QGCColoredImage {
+            //     source:             "/res/layout-right.svg"
+            //     mipmap:             true
+            //     width:              ScreenTools.minTouchPixels * 0.75
+            //     height:             width
+            //     sourceSize.width:   width
+            //     color:              qgcPal.text
+            //     fillMode:           Image.PreserveAspectFit
+            //     visible:            bottomMode
 
-                QGCMouseArea {
-                    fillItem:   parent
-                    onClicked:  bottomMode = false
-                }
-            }
+            //     QGCMouseArea {
+            //         fillItem:   parent
+            //         onClicked:  bottomMode = false
+            //     }
+            // }
 
             QGCColoredImage {
                 source:             valueArea.settingsUnlocked ? "/res/LockOpen.svg" : "/res/pencil.svg"

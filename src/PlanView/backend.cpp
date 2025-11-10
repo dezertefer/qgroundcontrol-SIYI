@@ -456,9 +456,21 @@ void BackEnd::removeDropPoint(int index) {
     }
 }
 
+void BackEnd::changeRating(int index, int newRating) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        QVariantMap map = m_dropPoints[index].toMap();
+        map["rating"] = newRating;
+        m_dropPoints[index] = map;   // <-- write back!
+        emit dropPointsChanged();
+        saveToFile();
+    }
+}
+
 void BackEnd::changeLabel(int index, const QString &newLabel) {
     if (index >= 0 && index < m_dropPoints.size()) {
-        m_dropPoints[index].toMap()["label"] = newLabel;
+        QVariantMap map = m_dropPoints[index].toMap();
+        map["label"] = newLabel;
+        m_dropPoints[index] = map;   // <-- write back!
         emit dropPointsChanged();
         saveToFile();
     }
@@ -466,17 +478,9 @@ void BackEnd::changeLabel(int index, const QString &newLabel) {
 
 void BackEnd::increaseCounter(int index) {
     if (index >= 0 && index < m_dropPoints.size()) {
-        int counter = m_dropPoints[index].toMap()["counter"].toInt();
-        m_dropPoints[index].toMap()["counter"] = counter + 1;
-        emit dropPointsChanged();
-        saveToFile();
-    }
-}
-
-void BackEnd::changeRating(int index, int newRating) {
-    if (index >= 0 && index < m_dropPoints.size()) {
-        qDebug() << newRating;
-        m_dropPoints[index].toMap()["rating"] = newRating;
+        QVariantMap map = m_dropPoints[index].toMap();
+        map["counter"] = map["counter"].toInt() + 1;
+        m_dropPoints[index] = map;   // <-- write back!
         emit dropPointsChanged();
         saveToFile();
     }

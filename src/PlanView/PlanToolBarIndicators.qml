@@ -93,10 +93,12 @@ Item {
         target: _controllerValid ? _planMasterController.missionController : null
         onProgressPctChanged: {
             if (_controllerProgressPct === 1) {
-                missionStats.visible = false
-                uploadCompleteText.visible = true
-                progressBar.visible = false
-                resetProgressTimer.start()
+
+                    missionStats.visible = false
+                    uploadCompleteText.visible = true
+                    progressBar.visible = false
+                    resetProgressTimer.start()
+
             } else if (_controllerProgressPct > 0) {
                 progressBar.visible = true
             }
@@ -105,7 +107,7 @@ Item {
 
     Timer {
         id:             resetProgressTimer
-        interval:       5000
+        interval:       2000
         onTriggered: {
             missionStats.visible = true
             uploadCompleteText.visible = false
@@ -118,7 +120,7 @@ Item {
         font.pointSize:         ScreenTools.largeFontPointSize
         horizontalAlignment:    Text.AlignHCenter
         verticalAlignment:      Text.AlignVCenter
-        text:                   qsTr("Done")
+        text:                   qsTr("Processing...")
         visible:                false
     }
 
@@ -207,27 +209,27 @@ Item {
         }
 
         GridLayout {
-            columns:                5
+            columns:                2
             rowSpacing:             _rowSpacing
             columnSpacing:          _labelToValueSpacing
             Layout.alignment:       Qt.AlignVCenter | Qt.AlignHCenter
 
-            QGCLabel {
-                text:               qsTr("Total Mission")
-                Layout.columnSpan:  5
-                font.pointSize:     ScreenTools.smallFontPointSize
-            }
+            // QGCLabel {
+            //     text:               qsTr("Total Mission")
+            //     Layout.columnSpan:  5
+            //     font.pointSize:     ScreenTools.smallFontPointSize
+            // }
+
+            // QGCLabel { text: qsTr("Distance:"); font.pointSize: _dataFontSize; }
+            // QGCLabel {
+            //     text:                   _missionDistanceText
+            //     font.pointSize:         _dataFontSize
+            //     Layout.minimumWidth:    _largeValueWidth
+            // }
+
+            //Item { width: 1; height: 1 }
 
             QGCLabel { text: qsTr("Distance:"); font.pointSize: _dataFontSize; }
-            QGCLabel {
-                text:                   _missionDistanceText
-                font.pointSize:         _dataFontSize
-                Layout.minimumWidth:    _largeValueWidth
-            }
-
-            Item { width: 1; height: 1 }
-
-            QGCLabel { text: qsTr("Max telem dist:"); font.pointSize: _dataFontSize; }
             QGCLabel {
                 text:                   _missionMaxTelemetryText
                 font.pointSize:         _dataFontSize
@@ -269,7 +271,7 @@ Item {
 
             id:          uploadButton
             text:        _controllerDirty ? qsTr("Upload Required") : qsTr("Upload")
-            enabled:     _KEK<1500 && !_controllerSyncInProgress
+            enabled:     _KEK<2000 && !_controllerSyncInProgress
             visible:     !_controllerOffline && !_controllerSyncInProgress && !uploadCompleteText.visible
             primary:     _controllerDirty
 
@@ -299,7 +301,7 @@ Item {
 
         QGCLabel
         {
-            text: _KEK<1500 ? "" : " Drop point is too far!"
+            text: _KEK<2000 ? "" : " Drop point is too far!"
             color: "red"
         }
     }
@@ -348,18 +350,18 @@ Item {
 
         QGCLabel {
             anchors.centerIn:   parent
-            text:               qsTr("Syncing Mission")
+            text:               qsTr("Mission Sync")
             font.pointSize:     ScreenTools.largeFontPointSize
         }
 
-        QGCLabel {
-            anchors.margins:    _margin
-            anchors.right:      parent.right
-            anchors.bottom:     parent.bottom
-            text:               qsTr("Click anywhere to hide")
+        // QGCLabel {
+        //     anchors.margins:    _margin
+        //     anchors.right:      parent.right
+        //     anchors.bottom:     parent.bottom
+        //     text:               qsTr("Click anywhere to hide")
 
-            property real _margin: ScreenTools.defaultFontPixelWidth / 2
-        }
+        //     property real _margin: ScreenTools.defaultFontPixelWidth / 2
+        // }
 
         MouseArea {
             anchors.fill:   parent

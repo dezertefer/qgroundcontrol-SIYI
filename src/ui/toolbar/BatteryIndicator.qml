@@ -29,26 +29,36 @@ Item {
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
 
+    // ★ Prefer a combined battery if the Vehicle exposes one; else fall back to the first pack
+    readonly property var _combinedBattery: (_activeVehicle && _activeVehicle.battery) ? _activeVehicle.battery : null
+    function firstBatteryOrNull() {
+        if (_activeVehicle && _activeVehicle.batteries && _activeVehicle.batteries.count > 0) {
+            return _activeVehicle.batteries.get(0)
+        }
+        return null
+    }
+    readonly property var _batteryForIndicator: _combinedBattery ? _combinedBattery : firstBatteryOrNull()
+
     Row {
         id:             batteryIndicatorRow
         anchors.top:    parent.top
         anchors.bottom: parent.bottom
 
-        Repeater {
-            model: _activeVehicle ? _activeVehicle.batteries : 0
+        // ★ Show only ONE indicator: combined (or first) instead of a Repeater of all
+        Loader {
+            anchors.top:        parent.top
+            anchors.bottom:     parent.bottom
+            sourceComponent:    batteryVisual
+            visible:            !!_batteryForIndicator
 
-            Loader {
-                anchors.top:        parent.top
-                anchors.bottom:     parent.bottom
-                sourceComponent:    batteryVisual
-
-                property var battery: object
-            }
+            property var battery: _batteryForIndicator
         }
     }
+
     MouseArea {
         anchors.fill:   parent
         onClicked: {
+            // ★ Keep popup behavior (still shows detailed per-battery table)
             mainWindow.showIndicatorPopup(_root, batteryPopup)
         }
     }
@@ -76,16 +86,16 @@ Item {
                 }
             }
 
-            function getBatteryPercentageText() {
-                if (!isNaN(battery.percentRemaining.rawValue)) {
-                    if (battery.percentRemaining.rawValue > 98.9) {
-                        return qsTr("100%")
-                    } else {
-                        return battery.percentRemaining.valueString + battery.percentRemaining.units
-                    }
-                } else if (!isNaN(battery.voltage.rawValue)) {
-                    return battery.voltage.valueString + battery.voltage.units
-                } else if (battery.chargeState.rawValue !== MAVLink.MAV_BATTERY_CHARGE_STATE_UNDEFINED) {
+            // ★ Force Volts: always show voltage (fall back gracefully if missing)
+            function getBatteryTextVolts() {
+                if (battery && !isNaN(battery.voltage.rawValue)) {
+                    return battery.voltage.valueString + " " + battery.voltage.units
+                }
+                // Optional secondary fallbacks if you ever expose them:
+                // if (!isNaN(battery.busVoltage?.rawValue)) { ... }
+                // if (!isNaN(battery.averageCellVoltage?.rawValue)) { ... }
+                // If no numeric voltage is available, fall back to charge state string
+                if (battery && battery.chargeState.rawValue !== MAVLink.MAV_BATTERY_CHARGE_STATE_UNDEFINED) {
                     return battery.chargeState.enumStringValue
                 }
                 return ""
@@ -102,7 +112,7 @@ Item {
             }
 
             QGCLabel {
-                text:                   getBatteryPercentageText()
+                text:                   getBatteryTextVolts()   // ★ volts instead of percent
                 font.pointSize:         ScreenTools.mediumFontPointSize
                 color:                  getBatteryColor()
                 anchors.verticalCenter: parent.verticalCenter

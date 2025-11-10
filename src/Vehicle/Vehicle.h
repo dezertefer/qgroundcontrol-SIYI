@@ -40,6 +40,7 @@
 #include "VehicleEscStatusFactGroup.h"
 #include "VehicleEstimatorStatusFactGroup.h"
 #include "VehicleHygrometerFactGroup.h"
+#include "VehicleActuatorOutputsFactGroup.h"
 #include "VehicleLinkManager.h"
 #include "MissionManager.h"
 #include "GeoFenceManager.h"
@@ -72,6 +73,7 @@ class LinkInterface;
 class LinkManager;
 class InitialConnectStateMachine;
 class Autotune;
+class VehicleActuatorOutputsFactGroup;
 
 #if defined(QGC_AIRMAP_ENABLED)
 class AirspaceVehicleManager;
@@ -319,6 +321,7 @@ public:
     Q_PROPERTY(FactGroup*           hygrometer      READ hygrometerFactGroup        CONSTANT)
     Q_PROPERTY(QmlObjectListModel*  batteries       READ batteries                  CONSTANT)
     Q_PROPERTY(Actuators*           actuators       READ actuators                  CONSTANT)
+    Q_PROPERTY(FactGroup*           actuatorOutputs READ actuatorOutputsFactGroup   CONSTANT)
 
     Q_PROPERTY(int      firmwareMajorVersion        READ firmwareMajorVersion       NOTIFY firmwareVersionChanged)
     Q_PROPERTY(int      firmwareMinorVersion        READ firmwareMinorVersion       NOTIFY firmwareVersionChanged)
@@ -331,6 +334,7 @@ public:
     Q_PROPERTY(QString  gitHash                     READ gitHash                    NOTIFY gitHashChanged)
     Q_PROPERTY(quint64  vehicleUID                  READ vehicleUID                 NOTIFY vehicleUIDChanged)
     Q_PROPERTY(QString  vehicleUIDStr               READ vehicleUIDStr              NOTIFY vehicleUIDChanged)
+
 
     /// Resets link status counters
     Q_INVOKABLE void resetCounters  ();
@@ -662,6 +666,7 @@ public:
     FactGroup* estimatorStatusFactGroup     () { return &_estimatorStatusFactGroup; }
     FactGroup* terrainFactGroup             () { return &_terrainFactGroup; }
     FactGroup* hygrometerFactGroup          () { return &_hygrometerFactGroup; }
+    FactGroup* actuatorOutputsFactGroup  () { return &_actuatorOutputsFactGroup; }
     QmlObjectListModel* batteries           () { return &_batteryFactGroupListModel; }
 
     MissionManager*                 missionManager      () { return _missionManager; }
@@ -1117,6 +1122,7 @@ private:
     ComponentInformationManager*    _componentInformationManager    = nullptr;
     VehicleObjectAvoidance*         _objectAvoidance                = nullptr;
     Autotune*                       _autotune                       = nullptr;
+
 #if defined(QGC_AIRMAP_ENABLED)
     AirspaceVehicleManager*         _airspaceVehicleManager         = nullptr;
 #endif
@@ -1319,6 +1325,7 @@ private:
     VehicleEstimatorStatusFactGroup _estimatorStatusFactGroup;
     VehicleHygrometerFactGroup      _hygrometerFactGroup;
     TerrainFactGroup                _terrainFactGroup;
+    VehicleActuatorOutputsFactGroup _actuatorOutputsFactGroup;
     QmlObjectListModel              _batteryFactGroupListModel;
 
     TerrainProtocolHandler* _terrainProtocolHandler = nullptr;
@@ -1371,6 +1378,7 @@ private:
     static const char* _estimatorStatusFactGroupName;
     static const char* _hygrometerFactGroupName;
     static const char* _terrainFactGroupName;
+    static const char* _actuatorOutputsFactGroupName;
 
     static const int _vehicleUIUpdateRateMSecs      = 100;
 

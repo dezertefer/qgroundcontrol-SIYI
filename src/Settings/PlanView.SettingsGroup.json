@@ -54,7 +54,7 @@
     "default":      20.0,
     "units":        "m",
     "min":          5.0,
-    "max":          60.0,
+    "max":          100.0,
     "decimalPlaces":    1
 },
 {

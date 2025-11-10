@@ -432,6 +432,7 @@ HEADERS += \
     src/PlanView/backend.h \
     src/QmlControls/QmlUnitsConversion.h \
     src/Settings/GeoserverSettings.h \
+    src/Vehicle/VehicleActuatorOutputsFactGroup.h \
     src/Vehicle/VehicleEscStatusFactGroup.h \
     src/api/QGCCorePlugin.h \
     src/api/QGCOptions.h \
@@ -447,6 +448,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 SOURCES += \
     src/PlanView/backend.cpp \
     src/Settings/GeoserverSettings.cpp \
+    src/Vehicle/VehicleActuatorOutputsFactGroup.cc \
     src/Vehicle/VehicleEscStatusFactGroup.cc \
     src/api/QGCCorePlugin.cc \
     src/api/QGCOptions.cc \

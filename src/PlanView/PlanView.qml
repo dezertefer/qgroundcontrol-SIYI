@@ -75,7 +75,7 @@ Item {
 
     property var _pendingCoord: null
 
-    property bool enableDebug: false
+    property bool enableDebug: true
 
     property real _takeoffRel: 2.0
 
@@ -842,45 +842,114 @@ Item {
                 delegate: MapQuickItem {
                     coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
 
-                    sourceItem: Rectangle {
-                        width: ScreenTools.defaultFontPixelHeight * 1.5
-                        height: ScreenTools.defaultFontPixelHeight * 1.5
-                        color: "transparent"
-                        border.color: "transparent"
-                        radius: ScreenTools.defaultFontPixelHeight * 0.75
-                        Image{
-                            id: pinpoint
-                            source:"/InstrumentValueIcons/location.svg"
-                            //color: "brown"
-                            width: parent.width
-                            height: parent.height
+                    sourceItem: Item {
+                        id: pinRoot
+                        property real pinScale: 1.5                                  // <— scale factor
+                        property real pinBase:  ScreenTools.defaultFontPixelHeight * 1.5
+
+                            // scale the whole marker (pin + badge + text)
+                        width:  Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+                        height: Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+
+                        // colors
+                        property color pinColor:  "#FFC107"   // amber
+                        property color pinStroke: "#7A5C00"   // darker outline
+
+                        // rating 0..5, always finite
+                        property int ratingVal: Math.max(0, Math.min(5, Math.round(
+                            Number(historyDropPoints.dummyModel[index] && historyDropPoints.dummyModel[index].rating) || 0
+                        )))
+
+                        // Draw the whole pin + badge in one pass
+                        Canvas {
+                            anchors.fill: parent
+                            contextType: "2d"
+                            renderTarget: Canvas.FramebufferObject
+
+                            onPaint: {
+                                const ctx   = getContext("2d")
+                                const dpr   = Screen.devicePixelRatio || 1
+                                const overs = 2.0
+
+                                if (ctx.resetTransform) ctx.resetTransform()
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.scale(dpr * overs, dpr * overs)
+
+                                const w = width  / (dpr * overs)
+                                const h = height / (dpr * overs)
+
+                                // geometry (same as before)
+                                const cx   = w * 0.5
+                                const r    = w * 0.34           // bulb radius
+                                const cy   = r + h * 0.16       // bulb center y
+                                const tipY = h * 0.98           // sharp tip
+                                const k    = 1.75               // side curve depth
+
+                                ctx.lineJoin = "round"
+                                ctx.lineCap  = "round"
+
+                                // pin body (watertight teardrop)
+                                ctx.beginPath()
+                                ctx.moveTo(cx + r, cy)                  // start at rightmost
+                                ctx.arc(cx, cy, r, 0, Math.PI, true)    // over the top to leftmost
+                                ctx.quadraticCurveTo(cx - r * 0.30, cy + r * k, cx, tipY)
+                                ctx.quadraticCurveTo(cx + r * 0.30, cy + r * k, cx + r, cy)
+                                ctx.closePath()
+
+                                ctx.fillStyle = pinRoot.pinColor
+                                ctx.fill()
+                                ctx.lineWidth   = Math.max(1, r * 0.10)
+                                ctx.strokeStyle = pinRoot.pinStroke
+                                ctx.stroke()
+
+                                const badgeR = r * 0.75;                 // was r * 0.46
+                                ctx.beginPath();
+                                ctx.arc(cx, cy, badgeR, 0, Math.PI * 2, false);
+                                ctx.fillStyle = "white";
+                                ctx.fill();
+                                ctx.lineWidth   = Math.max(1, r * 0.06);
+                                ctx.strokeStyle = "black";
+                                ctx.stroke();
+
+                                // --- centered number with explicit width-based centering ---
+                                const text   = String(pinRoot.ratingVal);
+                                const fontPx = Math.round(badgeR * 1.40);
+                                ctx.font = fontPx + "px sans-serif";
+                                ctx.fillStyle = "black";
+                                ctx.textBaseline = "middle";   // vertical center
+                                ctx.textAlign = "left";        // we'll position X manually
+
+                                // measure width in current transform (scaled context)
+                                let tw = 0;
+                                try { tw = ctx.measureText(text).width || 0; } catch (e) { tw = 0; }
+
+                                // small optical vertical nudge
+                                const yNudge = Math.round(fontPx * 0.06);
+
+                                // optional tiny per-digit horizontal tweak (helps "1")
+                                let xNudge = 0;
+                                if (text === "1") xNudge = -fontPx * 0.08;
+
+                                // center by hand using measured width
+                                const tx = cx - (tw / 2) + xNudge;
+                                ctx.fillText(text, tx, cy + yNudge);
+                            }
+
+                            Component.onCompleted: requestPaint()
+                            onWidthChanged: requestPaint()
+                            onHeightChanged: requestPaint()
                         }
 
-                        ColorOverlay{
-                            anchors.fill: pinpoint
-                            source:pinpoint
-                            color: "green"
-                            transform:rotation
-                            antialiasing: true
-                        }
-
-                        x: -width/2
+                        // keep your original offset so the tip points to the map coordinate
+                        x: -width / 2
                         y: -height
 
-                        // Debugging
-                        // Text {
-                        //     text: "Lat: " + model.lat + " Lon: " + model.lon
-                        //     color: "black"
-                        //     anchors.centerIn: parent
-                        // }
-
-                        MouseArea{
+                        MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                    console.log("mapItemClicked")
-                                    historyItemData = historyDropPoints.dummyModel[index]
-                                    historyItemData.index = index
-                                    mainWindow.showPopupDialogFromComponent(historyItemPopUp)
+                                historyItemData = historyDropPoints.dummyModel[index]
+                                historyItemData.index = index
+                                mainWindow.showPopupDialogFromComponent(historyItemPopUp)
                             }
                         }
                     }
@@ -986,7 +1055,7 @@ Item {
                     },*/
                     ToolStripAction {
                         id:                 addWaypointRallyPointAction
-                        text:               _editingLayer == _layerRallyPoints ? qsTr("Rally Point") : qsTr("Drop Point")
+                        text:               _editingLayer == _layerRallyPoints ? qsTr("Rally Point") : qsTr("Cast")
                         iconSource:         "/qmlimages/MapAddMission.svg"
                         enabled:            globals.activeVehicle && globals.activeVehicle.coordinate.isValid
                         visible:            true//toolStrip._isRallyLayer || toolStrip._isMissionLayer
@@ -1057,6 +1126,20 @@ Item {
                             } else {
                                 historyDropPoints.visible = false
                             }
+                        }
+                    },
+
+                    ToolStripAction {
+                        id:                 clearToolStripAction
+                        text:               qsTr("Clear")
+                        iconSource:         "/qmlimages/DatalinkLossLight.svg"
+                        enabled:            true
+                        visible:            true
+                        onTriggered:{
+                            mainWindow.showComponentDialog(clearVehicleMissionDialog, text, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
+                            //QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(false)
+                            //dropPointSelected = false
+                            backend.dropPointSelected = false
                         }
                     }
 
@@ -1327,35 +1410,67 @@ Item {
                     }
 
 
+                    RowLayout {
+                        id: ratingRow
+                        spacing: 8
 
-                    RowLayout{
-                        QGCButton{
-                            text: "-"
-                            onClicked:{
-                                if(historyItemData.rating>1){
-                                    historyItemData.rating = historyItemData.rating-1
-                                    rating.text = historyItemData.rating
-                                    backend.changeRating(historyItemData.index, historyItemData.rating)
+                        RowLayout {
+                            id: starBar
+                            property int maxStars: 5
+                            // Don't rely on a non-notifyable binding; seed once:
+                            property int value: historyItemData.rating
+                            readonly property string starIcon: "/InstrumentValueIcons/star-full.svg"
+
+                            function setRating(v) {
+                                var nv = Math.max(0, Math.min(maxStars, v))
+                                if (value === nv && historyItemData.rating === nv) return
+
+                                // 1) update local reactive value so UI changes immediately
+                                value = nv
+
+                                // 2) keep your data + backend in sync
+                                historyItemData.rating = nv
+                                rating.text = nv
+                                backend.changeRating(historyItemData.index, nv)
+                            }
+
+                            // 3) if rating can change from outside (after save/load), resync UI:
+                            Connections {
+                                target: backend
+                                onDropPointsChanged: {
+                                    // pull fresh value from your item, then reflect locally
+                                    starBar.value = historyItemData.rating
+                                }
+                            }
+
+                            spacing: 6
+
+                            Repeater {
+                                model: starBar.maxStars
+                                delegate: Item {
+                                    width: 40; height: 40
+                                    property int starIndex: index + 1
+
+                                    QGCColoredImage {
+                                        anchors.fill: parent
+                                        source: starBar.starIcon
+                                        fillMode: Image.PreserveAspectFit
+                                        // Drive transparency via color alpha (reliably updates)
+                                        color: Qt.rgba(1, 1, 1, starBar.value >= starIndex ? 1.0 : 0.6)
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: starBar.setRating(starIndex)
+                                        hoverEnabled: true
+                                    }
                                 }
                             }
                         }
 
                         QGCLabel {
-                            id:                 rating
-                            text:               historyItemData.rating
-                            visible:            true
-                            //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
-                        }
-
-                        QGCButton{
-                            text: "+"
-                            onClicked:{
-                                if(historyItemData.rating<5){
-                                    historyItemData.rating = historyItemData.rating+1
-                                    rating.text = historyItemData.rating
-                                    backend.changeRating(historyItemData.index, historyItemData.rating+1)
-                                }
-                            }
+                            id: rating
+                            text: historyItemData.rating
+                            visible: true
                         }
                     }
 

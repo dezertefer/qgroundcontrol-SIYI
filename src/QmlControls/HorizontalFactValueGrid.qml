@@ -28,6 +28,7 @@ T.HorizontalFactValueGrid {
     id:                     _root
     Layout.preferredWidth:  topLayout.width
     Layout.preferredHeight: topLayout.height
+    Layout.fillWidth:       true
 
     property bool   settingsUnlocked:       false
 
@@ -44,28 +45,38 @@ T.HorizontalFactValueGrid {
         spacing:    0
 
         RowLayout {
+            Layout.fillWidth:   true
+
             RowLayout {
-                id:         labelValueColumnLayout
-                spacing:    ScreenTools.defaultFontPixelWidth * 1.25
+                id:             labelValueColumnLayout
+                spacing:        ScreenTools.defaultFontPixelWidth * 1.25
+                Layout.fillWidth: true
 
                 Repeater {
                     model: _root.columns
 
                     GridLayout {
+                        id:             columnGrid
                         rows:           object.count
                         columns:        2
                         rowSpacing:     0
                         columnSpacing:  ScreenTools.defaultFontPixelWidth / 4
                         flow:           GridLayout.TopToBottom
+                        Layout.fillWidth: true
+
+                        // baseline width; we reduce it by 10%
+                        property real widthFactor:   0.7
+                        property int  valueBasePx:   ScreenTools.defaultFontPixelWidth * 20
+                        property real valueMinWidth: valueBasePx * widthFactor
 
                         Repeater {
                             id:     labelRepeater
                             model:  object
 
                             InstrumentValueLabel {
-                                Layout.fillHeight:      true
-                                Layout.alignment:       Qt.AlignRight
-                                instrumentValueData:    object
+                                Layout.fillHeight:  true
+                                Layout.alignment:   Qt.AlignHCenter | Qt.AlignVCenter   // centered
+                                instrumentValueData: object
                             }
                         }
 
@@ -74,21 +85,30 @@ T.HorizontalFactValueGrid {
                             model:  object
 
                             property real   _index:     index
-                            property real   maxWidth:   0
+                            property real   maxWidth:   0       // content-driven max
                             property var    lastCheck:  new Date().getTime()
 
                             function recalcWidth() {
                                 var newMaxWidth = 0
-                                for (var i=0; i<valueRepeater.count; i++) {
-                                    newMaxWidth = Math.max(newMaxWidth, valueRepeater.itemAt(0).contentWidth)
+                                for (var i = 0; i < valueRepeater.count; i++) {
+                                    var itm = valueRepeater.itemAt(i)
+                                    if (itm) newMaxWidth = Math.max(newMaxWidth, itm.contentWidth)
                                 }
-                                maxWidth = Math.min(maxWidth, newMaxWidth)
+                                maxWidth = Math.max(maxWidth, newMaxWidth)
                             }
 
                             InstrumentValueValue {
                                 Layout.fillHeight:      true
-                                Layout.alignment:       Qt.AlignLeft
-                                Layout.preferredWidth:  valueRepeater.maxWidth
+                                Layout.alignment:       Qt.AlignHCenter | Qt.AlignVCenter   // centered
+                                Layout.fillWidth:       true
+
+                                // Keep respecting content width, but use a 10% smaller baseline
+                                // target = max(content width seen, baseline)
+                                readonly property real targetWidth: Math.max(valueRepeater.maxWidth, columnGrid.valueMinWidth)
+
+                                Layout.minimumWidth:    columnGrid.valueMinWidth
+                                Layout.preferredWidth:  targetWidth * columnGrid.widthFactor
+
                                 instrumentValueData:    object
 
                                 property real lastContentWidth
@@ -126,7 +146,14 @@ T.HorizontalFactValueGrid {
                     Layout.preferredHeight: ScreenTools.minTouchPixels
                     Layout.preferredWidth:  parent.width
                     text:                   qsTr("+")
-                    onClicked:              appendColumn()
+                    enabled: _root.columns.count < 3
+                    onClicked: {
+                        if (_root.columns.count < 3) {     // *** limit columns to 3
+                            appendColumn()
+                        } else {
+                            qgcApp.showAppMessage(qsTr("Maximum of 3 columns reached"))
+                        }
+                    }
                 }
 
                 QGCButton {
@@ -151,7 +178,14 @@ T.HorizontalFactValueGrid {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: parent.height
                 text:                   qsTr("+")
-                onClicked:              appendRow()
+                enabled: _root.rowCount < 5
+                onClicked: {
+                    if (_root.rowCount < 5) {          // *** limit rows to 5
+                        appendRow()
+                    } else {
+                        qgcApp.showAppMessage(qsTr("Maximum of 5 rows reached"))
+                    }
+                }
             }
 
             QGCButton {
@@ -176,10 +210,8 @@ T.HorizontalFactValueGrid {
 
         onClicked: {
             var columnGridLayoutItem = labelValueColumnLayout.childAt(mouse.x, mouse.y)
-            //console.log(mouse.x, mouse.y, columnGridLayoutItem)
             var mappedMouse = labelValueColumnLayout.mapToItem(columnGridLayoutItem, mouse.x, mouse.y)
             var labelOrDataItem = columnGridLayoutItem.childAt(mappedMouse.x, mappedMouse.y)
-            //console.log(mappedMouse.x, mappedMouse.y, labelOrDataItem, labelOrDataItem ? labelOrDataItem.instrumentValueData : "null", labelOrDataItem && labelOrDataItem.parent ? labelOrDataItem.parent.instrumentValueData : "null")
             if (labelOrDataItem && labelOrDataItem.instrumentValueData !== undefined) {
                 mainWindow.showPopupDialogFromComponent(valueEditDialog, { instrumentValueData: labelOrDataItem.instrumentValueData })
             }
@@ -188,7 +220,6 @@ T.HorizontalFactValueGrid {
 
     Component {
         id: valueEditDialog
-
         InstrumentValueEditDialog { }
     }
 }

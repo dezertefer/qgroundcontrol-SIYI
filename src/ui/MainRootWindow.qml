@@ -20,6 +20,7 @@ import QGroundControl.ScreenTools   1.0
 import QGroundControl.FlightDisplay 1.0
 import QGroundControl.FlightMap     1.0
 import io.qt.examples.backend           1.0
+import QtMultimedia 5.15
 
 /// @brief Native QML top level window
 /// All properties defined here are visible to all QML pages.
@@ -28,6 +29,53 @@ ApplicationWindow {
     minimumWidth:   ScreenTools.isMobile ? Screen.width  : Math.min(ScreenTools.defaultFontPixelWidth * 100, Screen.width)
     minimumHeight:  ScreenTools.isMobile ? Screen.height : Math.min(ScreenTools.defaultFontPixelWidth * 50, Screen.height)
     visible:        true
+
+
+    // Item {
+    //     id: audioPlayer
+    //     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
+    //     property var servo1: vehicle && vehicle.actuatorOutputs ? vehicle.actuatorOutputs.pwm1 : null
+    //     property var oldServo9:0
+
+    //     Audio {
+    //         id: servo1Sound
+    //         source: "qrc:/res/audio/src/Fishing_line_released_NZ_female.mp3"
+    //         volume: 1.0
+    //     }
+
+    //     Timer{
+    //         interval: 1000;
+    //         running: true;
+    //         repeat: true
+    //         onTriggered: {
+    //             if(QGroundControl.multiVehicleManager.activeVehicle){
+    //                 var grp = QGroundControl.multiVehicleManager.activeVehicle.actuatorOutputs
+    //                 if (!grp) {
+    //                     console.log("[servo] no actuatorOutputsRaw group yet")
+    //                     return
+    //                 }
+    //                 for (let i = 1; i <= 16; ++i)
+    //                 {
+    //                     if(i===9){
+    //                         let fact = grp.pwmFact ? grp.pwmFact(i) : (grp["pwm" + i] || null)
+    //                         let pwm = fact ? fact.rawValue : undefined
+    //                         //console.log(pwm)
+    //                         if (pwm === 0){
+    //                             return
+    //                         }
+    //                         if (pwm!==audioPlayer.oldServo9){
+    //                             if(audioPlayer.oldServo9<1150 || audioPlayer.oldServo9>=1250 && pwm>1150 && pwm < 1250 ){
+    //                                 console.log("WORKED!")
+    //                                 servo1Sound.play()
+    //                             }
+    //                             audioPlayer.oldServo9 = pwm
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     Component.onCompleted: {
         //-- Full screen on mobile or tiny screens
@@ -41,6 +89,8 @@ ApplicationWindow {
         // Start the sequence of first run prompt(s)
         firstRunPromptManager.nextPrompt()
     }
+
+
 
     QtObject {
         id: firstRunPromptManager

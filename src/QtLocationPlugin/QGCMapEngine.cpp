@@ -19,6 +19,12 @@
 #include "AppSettings.h"
 #include "SettingsManager.h"
 
+#ifdef Q_OS_ANDROID
+#include <QtAndroid>
+#include <QAndroidJniEnvironment>
+#include <QAndroidJniObject>
+#endif
+
 #include <math.h>
 #include <QSettings>
 #include <QStandardPaths>
@@ -27,6 +33,66 @@
 
 #include "QGCMapEngine.h"
 #include "QGCMapTileSet.h"
+
+// Prefer removable app-specific dir (SD) for the map cache on Android
+static QString qgcPreferredMapCacheBaseAndroid(const QString& subdir /* e.g. "/QGCMapCache300" */)
+{
+#ifdef Q_OS_ANDROID
+    // Default to internal app storage
+    const QString fallback =
+#ifdef __mobile__
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + subdir;
+#else
+        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + subdir;
+#endif
+
+    QAndroidJniObject activity = QtAndroid::androidActivity();
+    if (!activity.isValid())
+        return fallback;
+
+    // Java: File[] dirs = getExternalFilesDirs(null);
+    QAndroidJniObject arr = activity.callObjectMethod(
+        "getExternalFilesDirs", "(Ljava/lang/String;)[Ljava/io/File;", nullptr);
+    if (!arr.isValid())
+        return fallback;
+
+    QAndroidJniEnvironment env;
+    jobjectArray jarr = static_cast<jobjectArray>(arr.object<jobject>());
+    const jsize n = env->GetArrayLength(jarr);
+
+    QString primary, removable;
+
+    for (jsize i = 0; i < n; ++i) {
+        jobject fileObj = env->GetObjectArrayElement(jarr, i);
+        QAndroidJniObject file(fileObj);
+        if (file.isValid()) {
+            QString path = file.callObjectMethod("getAbsolutePath", "()Ljava/lang/String;").toString();
+
+            // boolean isRemovable = Environment.isExternalStorageRemovable(file)
+            jboolean isRemovable = QAndroidJniObject::callStaticMethod<jboolean>(
+                "android/os/Environment", "isExternalStorageRemovable",
+                "(Ljava/io/File;)Z", file.object<jobject>());
+
+            if (isRemovable)
+                removable = path;
+            else
+                primary = path;
+        }
+        env->DeleteLocalRef(fileObj);
+    }
+
+    QString base = !removable.isEmpty() ? removable
+                                        : (!primary.isEmpty() ? primary
+                                                              : fallback);
+
+    base = QDir::cleanPath(base + subdir);
+    QDir().mkpath(base);
+    return base;
+#else
+    Q_UNUSED(subdir)
+    return QString();
+#endif
+}
 
 Q_DECLARE_METATYPE(QGCMapTask::TaskType)
 Q_DECLARE_METATYPE(QGCTile)
@@ -143,28 +209,40 @@ QGCMapEngine::init()
 {
     //-- Delete old style caches (if present)
     _wipeOldCaches();
-    //-- Figure out cache path
-#ifdef __mobile__
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)      + QLatin1String("/QGCMapCache" CACHE_PATH_VERSION);
+
+//-- Determine cache path
+#if defined(Q_OS_ANDROID)
+    // Prefer SD card app-specific dir if present; else fall back to internal
+    QString cacheDir = qgcPreferredMapCacheBaseAndroid(QLatin1String("/QGCMapCache" CACHE_PATH_VERSION));
+#elif defined(__mobile__)
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                       + QLatin1String("/QGCMapCache" CACHE_PATH_VERSION);
 #else
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation) + QStringLiteral("/QGCMapCache" CACHE_PATH_VERSION);
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
+                       + QStringLiteral("/QGCMapCache" CACHE_PATH_VERSION);
 #endif
-    if(!QDir::root().mkpath(cacheDir)) {
-        qWarning() << "Could not create mapping disk cache directory: " << cacheDir;
+
+    //-- Create directory if needed
+    if (!QDir::root().mkpath(cacheDir)) {
+        qWarning() << "Could not create mapping disk cache directory:" << cacheDir;
         cacheDir = QDir::homePath() + QStringLiteral("/.qgcmapscache/");
-        if(!QDir::root().mkpath(cacheDir)) {
-            qWarning() << "Could not create mapping disk cache directory: " << cacheDir;
+        if (!QDir::root().mkpath(cacheDir)) {
+            qWarning() << "Could not create mapping disk cache directory:" << cacheDir;
             cacheDir.clear();
         }
     }
+
     _cachePath = cacheDir;
-    if(!_cachePath.isEmpty()) {
+
+    if (!_cachePath.isEmpty()) {
         _cacheFile = kDbFileName;
         _worker.setDatabaseFile(_cachePath + "/" + _cacheFile);
         qDebug() << "Map Cache in:" << _cachePath << "/" << _cacheFile;
     } else {
         qCritical() << "Could not find suitable map cache directory.";
     }
+
+    // Initialize worker thread
     QGCMapTask* task = new QGCMapTask(QGCMapTask::taskInit);
     _worker.enqueueTask(task);
 }
