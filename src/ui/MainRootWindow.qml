@@ -31,51 +31,71 @@ ApplicationWindow {
     visible:        true
 
 
-    // Item {
-    //     id: audioPlayer
-    //     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
-    //     property var servo1: vehicle && vehicle.actuatorOutputs ? vehicle.actuatorOutputs.pwm1 : null
-    //     property var oldServo9:0
+    Item {
+        id: audioPlayer
+        property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
+        property var servo1: vehicle && vehicle.actuatorOutputs ? vehicle.actuatorOutputs.pwm1 : null
+        property var oldServo9:0
 
-    //     Audio {
-    //         id: servo1Sound
-    //         source: "qrc:/res/audio/src/Fishing_line_released_NZ_female.mp3"
-    //         volume: 1.0
-    //     }
+        Audio {
+            id: servo1Sound
+            source: "qrc:/res/audio/src/Fishing_line_released_NZ_female.mp3"
+            volume: 1.0
+        }
 
-    //     Timer{
-    //         interval: 1000;
-    //         running: true;
-    //         repeat: true
-    //         onTriggered: {
-    //             if(QGroundControl.multiVehicleManager.activeVehicle){
-    //                 var grp = QGroundControl.multiVehicleManager.activeVehicle.actuatorOutputs
-    //                 if (!grp) {
-    //                     console.log("[servo] no actuatorOutputsRaw group yet")
-    //                     return
-    //                 }
-    //                 for (let i = 1; i <= 16; ++i)
-    //                 {
-    //                     if(i===9){
-    //                         let fact = grp.pwmFact ? grp.pwmFact(i) : (grp["pwm" + i] || null)
-    //                         let pwm = fact ? fact.rawValue : undefined
-    //                         //console.log(pwm)
-    //                         if (pwm === 0){
-    //                             return
-    //                         }
-    //                         if (pwm!==audioPlayer.oldServo9){
-    //                             if(audioPlayer.oldServo9<1150 || audioPlayer.oldServo9>=1250 && pwm>1150 && pwm < 1250 ){
-    //                                 console.log("WORKED!")
-    //                                 servo1Sound.play()
-    //                             }
-    //                             audioPlayer.oldServo9 = pwm
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        Timer {
+            interval: 1000
+            running: true
+            repeat: true
+            onTriggered: {
+                if (!QGroundControl.multiVehicleManager.activeVehicle)
+                    return
+
+                var grp = QGroundControl.multiVehicleManager.activeVehicle.actuatorOutputs
+                if (!grp) {
+                    console.log("[servo] no actuatorOutputs group yet")
+                    return
+                }
+
+                // We only care about CH9
+                let fact = grp.pwmFact ? grp.pwmFact(9) : (grp["pwm9"] || null)
+                let pwm  = fact ? fact.rawValue : 0
+
+                //console.log("[servo] ch9 pwm:", pwm, "old:", audioPlayer.oldServo9)
+
+                // Ignore 0 / invalid values
+                if (pwm === 0)
+                    return
+
+                // First valid sample: just store baseline, don't trigger
+                if (audioPlayer.oldServo9 === 0 || audioPlayer.oldServo9 === undefined) {
+                    audioPlayer.oldServo9 = pwm
+                    return
+                }
+
+                if (pwm !== audioPlayer.oldServo9) {
+                    // Was outside 1000–1250, now inside -> trigger
+                    const wasOut = (audioPlayer.oldServo9 < 1000 || audioPlayer.oldServo9 >= 1250)
+                    const nowIn  = (pwm > 1000 && pwm < 1250)
+
+                    if (wasOut && nowIn) {
+                        console.log("WORKED! edge into window")
+                        servo1Sound.play()
+
+                        if (globals.activeVehicle && globals.activeVehicle.coordinate.isValid && globals.activeVehicle.flying) {
+                            const c = globals.activeVehicle.coordinate
+                            backend.addDropPoint("Point", c.latitude, c.longitude)
+                            console.log("[drop] saved drop point at", c.latitude, c.longitude)
+                        } else {
+                            console.log("[drop] cannot save drop point: no valid activeVehicle coordinate")
+                        }
+                    }
+
+                    audioPlayer.oldServo9 = pwm
+                }
+            }
+        }
+    }
 
     Component.onCompleted: {
         //-- Full screen on mobile or tiny screens

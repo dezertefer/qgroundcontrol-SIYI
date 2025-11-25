@@ -455,6 +455,24 @@ void APMFirmwarePlugin::initializeStreamRates(Vehicle* vehicle)
     // Which also means than on older firmwares you may be left with some missing features.
     vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_SET_MESSAGE_INTERVAL, false /* showError */, MAVLINK_MSG_ID_HOME_POSITION, 1000000 /* 1 second interval in usec */);
 
+    // vehicle->requestDataStream(MAV_DATA_STREAM_EXTRA3, 5);
+
+    // vehicle->sendMavCommand(
+    //     MAV_COMP_ID_AUTOPILOT1,
+    //     MAV_CMD_SET_MESSAGE_INTERVAL,
+    //     false,                               // showError
+    //     MAVLINK_MSG_ID_SERVO_OUTPUT_RAW,
+    //     200000                               // 200,000 us interval (5 Hz)
+    //     );
+
+    vehicle->sendMavCommand(
+        MAV_COMP_ID_AUTOPILOT1,
+        MAV_CMD_SET_MESSAGE_INTERVAL,
+        false,                               // showError
+        MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS,
+        200000                               // 200,000 us interval (5 Hz)
+        );
+
     instanceData->lastBatteryStatusTime = instanceData->lastHomePositionTime = QTime::currentTime();
 }
 

@@ -717,30 +717,100 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         break;
     case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
         _handleGlobalPositionInt(message);
+        break;
+    // case MAVLINK_MSG_ID_ACTUATOR_OUTPUT_STATUS: {
+    //     mavlink_actuator_output_status_t a{};
+    //     mavlink_msg_actuator_output_status_decode(&message, &a);
+
+    //     // Print header (time + active bitmask)
+    //     qDebug() << "ACTUATOR_OUTPUT_STATUS:"
+    //              << "time_usec:" << a.time_usec
+    //              << "active bits:" << Qt::hex << a.active << Qt::dec;
+
+    //     // Print all 32 actuator values in one line (or you can limit to first 16)
+    //     QStringList vals;
+    //     for (int i = 0; i < 32; ++i) {
+    //         vals << QString("CH%1=%2").arg(i + 1).arg(a.actuator[i]);
+    //     }
+    //     qDebug().noquote() << "  actuators:" << vals.join(", ");
+
+    //     break;
+    // };
     case MAVLINK_MSG_ID_SERVO_OUTPUT_RAW: {
         mavlink_servo_output_raw_t s{};
         mavlink_msg_servo_output_raw_decode(&message, &s);
 
-        const int base = (int(s.port) * 8);      // 0 -> ch 1..8, 1 -> ch 9..16
-        if (base != 0 && base != 8) break;       // ignore any weird ports
+        // Debug: see length and CH9
+        // qDebug().noquote()
+        //     << "SERVO_OUTPUT_RAW len =" << message.len
+        //     << "port:" << int(s.port)
+        //     << " CH1:"  << s.servo1_raw
+        //     << " CH2:"  << s.servo2_raw
+        //     << " CH3:"  << s.servo3_raw
+        //     << " CH4:"  << s.servo4_raw
+        //     << " CH5:"  << s.servo5_raw
+        //     << " CH6:"  << s.servo6_raw
+        //     << " CH7:"  << s.servo7_raw
+        //     << " CH8:"  << s.servo8_raw
+        //     << " CH9:"  << s.servo9_raw
+        //     << " CH10:" << s.servo10_raw
+        //     << " CH11:" << s.servo11_raw
+        //     << " CH12:" << s.servo12_raw
+        //     << " CH13:" << s.servo13_raw
+        //     << " CH14:" << s.servo14_raw
+        //     << " CH15:" << s.servo15_raw
+        //     << " CH16:" << s.servo16_raw;
 
-        const uint16_t vv[8] = {
-            s.servo1_raw, s.servo2_raw, s.servo3_raw, s.servo4_raw,
-            s.servo5_raw, s.servo6_raw, s.servo7_raw, s.servo8_raw
+        // Only treat “normal” servo PWM range as valid
+        auto sanitizePwm = [](uint16_t v) -> uint16_t {
+            if (v < 800 || v > 2200) {
+                return 0;   // treat out-of-range / garbage as 0
+            }
+            return v;
         };
 
-        for (int i = 0; i < 8; ++i) {
-            const int ch = base + i + 1;         // 1..16
-            uint16_t pwm = vv[i];
+        // Full 16-channel array for easy indexing (1-based channel index → [ch-1])
+        const uint16_t vv[16] = {
+            s.servo1_raw,  s.servo2_raw,  s.servo3_raw,  s.servo4_raw,
+            s.servo5_raw,  s.servo6_raw,  s.servo7_raw,  s.servo8_raw,
+            s.servo9_raw,  s.servo10_raw, s.servo11_raw, s.servo12_raw,
+            s.servo13_raw, s.servo14_raw, s.servo15_raw, s.servo16_raw
+        };
 
-            // ArduPilot uses 0 for “unused”. Extensions/Garbage often show big numbers/0xFFFF.
-            if (pwm < 800 || pwm > 2200 || pwm == 0xFFFF)
-            {
-                pwm = 0;
+        // How many channels are actually in this payload?
+        //
+        // Base payload (MAVLink1) = 21 bytes:
+        //   time_usec (4) + servo1..8 (16) + port (1)
+        //
+        // Each extra servo = 2 bytes, starting at servo9_raw.
+        //
+        // len 21 →  8 channels (1..8)
+        // len 29 → 12 channels (1..12)
+        // len 37 → 16 channels (1..16)
+        int extraBytes   = qMax(0, int(message.len) - 21);
+        int extraServos  = extraBytes / 2;
+        int totalChannels = qMin(8 + extraServos, 16);
+
+        // Port mapping: 0 = MAIN (1–8, 9–16), 1 = AUX, etc.
+        // For ArduPilot on Pixhawk-style boards:
+        //   port 0 → channels 1..8
+        //   port 1 → channels 9..16
+        const int base = int(s.port) * 8;   // starting channel index (0-based)
+        if (base < 0 || base > 8) {
+            // unknown / weird port, ignore for now
+            break;
+        }
+
+        // Push all present channels into the FactGroup
+        for (int i = 0; i < totalChannels; ++i) {
+            const int ch = base + i + 1;   // ch = 1..16
+            if (ch < 1 || ch > 16) {
+                continue;
             }
-
+            uint16_t pwm = sanitizePwm(vv[ch - 1]);
             _actuatorOutputsFactGroup.setPwm(ch, pwm);
         }
+
         break;
     }
     case MAVLINK_MSG_ID_ALTITUDE:

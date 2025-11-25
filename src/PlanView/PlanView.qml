@@ -75,7 +75,7 @@ Item {
 
     property var _pendingCoord: null
 
-    property bool enableDebug: true
+    property bool enableDebug: false
 
     property real _takeoffRel: 2.0
 
@@ -346,7 +346,7 @@ Item {
             }
             switch (_missionController.sendToVehiclePreCheck()) {
                 case MissionController.SendToVehiclePreCheckStateOk:
-                    backend.addDropPoint("Point", globals.pointToAdd.lat, globals.pointToAdd.lon)
+                    //backend.addDropPoint("Point", globals.pointToAdd.lat, globals.pointToAdd.lon)
                     sendToVehicle()
                     break
                 case MissionController.SendToVehiclePreCheckStateActiveMission:
