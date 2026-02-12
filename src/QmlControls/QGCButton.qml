@@ -2,8 +2,11 @@ import QtQuick                  2.3
 import QtQuick.Controls         2.12
 import QtQuick.Controls.Styles  1.4
 
-import QGroundControl.Palette 1.0
-import QGroundControl.ScreenTools 1.0
+import QGroundControl                   1.0
+import QGroundControl.Controls          1.0
+import QGroundControl.ScreenTools       1.0
+import QGroundControl.SettingsManager   1.0
+import QGroundControl.Palette               1.0
 
 Button {
     id:             control
@@ -15,17 +18,19 @@ Button {
     focusPolicy:    Qt.ClickFocus
 
     property bool   primary:        false                               ///< primary button for a group of buttons
-    property real   pointSize:      ScreenTools.defaultFontPointSize    ///< Point size for button text
+    property real   pointSize:      mapScaleButton ? ScreenTools.defaultFontPointSize*1.7 : ScreenTools.defaultFontPointSize    ///< Point size for button text
     property bool   showBorder:     qgcPal.globalTheme === QGCPalette.Light
     property bool   iconLeft:       false
     property real   backRadius:     0
     property real   heightFactor:   0.5
     property string iconSource
+    property bool   historyButton:  false
+    property bool   mapScaleButton: false
 
     property alias wrapMode:            text.wrapMode
     property alias horizontalAlignment: text.horizontalAlignment
 
-    property bool   _showHighlight:     pressed | hovered | checked
+    property bool   _showHighlight:     historyButton ? QGroundControl.settingsManager.flightMapSettings.enableHistory.value : pressed | hovered | checked
 
     property int _horizontalPadding:    ScreenTools.defaultFontPixelWidth
     property int _verticalPadding:      Math.round(ScreenTools.defaultFontPixelHeight * heightFactor)

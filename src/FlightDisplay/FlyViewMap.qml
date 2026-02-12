@@ -23,6 +23,18 @@ import QGroundControl.Palette       1.0
 import QGroundControl.ScreenTools   1.0
 import QGroundControl.Vehicle       1.0
 
+
+
+import QtQuick.Layouts  1.2
+import QtQuick.Window   2.2
+import QtGraphicalEffects 1.12
+import QGroundControl.FactSystem        1.0
+import QGroundControl.FactControls      1.0
+import QGroundControl.ShapeFileHelper   1.0
+import QGroundControl.Airmap            1.0
+
+import io.qt.examples.backend           1.0
+
 FlightMap {
     id:                         _root
     allowGCSLocationCenter:     true
@@ -53,6 +65,8 @@ FlightMap {
     property bool   _airspaceEnabled:           QGroundControl.airmapSupported ? (QGroundControl.settingsManager.airMapSettings.enableAirMap.rawValue && QGroundControl.airspaceManager.connected): false
     property var    _flyViewSettings:           QGroundControl.settingsManager.flyViewSettings
     property bool   _keepMapCenteredOnVehicle:  _flyViewSettings.keepMapCenteredOnVehicle.rawValue
+
+    property var    historyItemData
 
     property bool   _disableVehicleTracking:    false
     property bool   _keepVehicleCentered:       pipMode ? true : false
@@ -512,51 +526,51 @@ FlightMap {
     }
 
     // Handle guided mode clicks
-    MouseArea {
-        anchors.fill: parent
+    // MouseArea {
+    //     anchors.fill: parent
 
-        QGCMenu {
-            id: clickMenu
-            property var coord
-            QGCMenuItem {
-                text:           qsTr("Go to location")
-                visible:        globals.guidedControllerFlyView.showGotoLocation
+    //     QGCMenu {
+    //         id: clickMenu
+    //         property var coord
+    //         QGCMenuItem {
+    //             text:           qsTr("Go to location")
+    //             visible:        globals.guidedControllerFlyView.showGotoLocation
 
-                onTriggered: {
-                    gotoLocationItem.show(clickMenu.coord)
-                    globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionGoto, clickMenu.coord, gotoLocationItem)
-                }
-            }
-            QGCMenuItem {
-                text:           qsTr("Orbit at location")
-                visible:        globals.guidedControllerFlyView.showOrbit
+    //             onTriggered: {
+    //                 gotoLocationItem.show(clickMenu.coord)
+    //                 globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionGoto, clickMenu.coord, gotoLocationItem)
+    //             }
+    //         }
+    //         QGCMenuItem {
+    //             text:           qsTr("Orbit at location")
+    //             visible:        globals.guidedControllerFlyView.showOrbit
 
-                onTriggered: {
-                    orbitMapCircle.show(clickMenu.coord)
-                    globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionOrbit, clickMenu.coord, orbitMapCircle)
-                }
-            }
-            QGCMenuItem {
-                text:           qsTr("ROI at location")
-                visible:        globals.guidedControllerFlyView.showROI
+    //             onTriggered: {
+    //                 orbitMapCircle.show(clickMenu.coord)
+    //                 globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionOrbit, clickMenu.coord, orbitMapCircle)
+    //             }
+    //         }
+    //         QGCMenuItem {
+    //             text:           qsTr("ROI at location")
+    //             visible:        globals.guidedControllerFlyView.showROI
 
-                onTriggered: {
-                    roiLocationItem.show(clickMenu.coord)
-                    globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionROI, clickMenu.coord, roiLocationItem)
-                }
-            }
-        }
+    //             onTriggered: {
+    //                 roiLocationItem.show(clickMenu.coord)
+    //                 globals.guidedControllerFlyView.confirmAction(globals.guidedControllerFlyView.actionROI, clickMenu.coord, roiLocationItem)
+    //             }
+    //         }
+    //     }
 
-        onClicked: {
-            if (!globals.guidedControllerFlyView.guidedUIVisible && (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit || globals.guidedControllerFlyView.showROI)) {
-                orbitMapCircle.hide()
-                gotoLocationItem.hide()
-                var clickCoord = _root.toCoordinate(Qt.point(mouse.x, mouse.y), false /* clipToViewPort */)
-                clickMenu.coord = clickCoord
-                clickMenu.popup()
-            }
-        }
-    }
+    //     onClicked: {
+    //         if (!globals.guidedControllerFlyView.guidedUIVisible && (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit || globals.guidedControllerFlyView.showROI)) {
+    //             orbitMapCircle.hide()
+    //             gotoLocationItem.hide()
+    //             var clickCoord = _root.toCoordinate(Qt.point(mouse.x, mouse.y), false /* clipToViewPort */)
+    //             clickMenu.coord = clickCoord
+    //             clickMenu.popup()
+    //         }
+    //     }
+    // }
 
     // Airspace overlap support
     MapItemView {
@@ -580,10 +594,275 @@ FlightMap {
         }
     }
 
+    MapItemView {
+        id: historyDropPoints
+        model: backend.dropPoints
+        property var dummyModel : backend.dropPoints
+        visible: QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+        delegate: MapQuickItem {
+            coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
+
+            sourceItem: Item {
+                id: pinRoot
+                property real pinScale: 1.5                                  // <— scale factor
+                property real pinBase:  ScreenTools.defaultFontPixelHeight * 1.5
+
+                    // scale the whole marker (pin + badge + text)
+                width:  Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+                height: Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+
+                // colors
+                property color pinColor:  "#FFC107"   // amber
+                property color pinStroke: "#7A5C00"   // darker outline
+
+                // rating 0..5, always finite
+                property int ratingVal: Math.max(0, Math.min(5, Math.round(
+                    Number(historyDropPoints.dummyModel[index] && historyDropPoints.dummyModel[index].rating) || 0
+                )))
+
+                // Draw the whole pin + badge in one pass
+                Canvas {
+                    anchors.fill: parent
+                    contextType: "2d"
+                    renderTarget: Canvas.FramebufferObject
+
+                    onPaint: {
+                        const ctx   = getContext("2d")
+                        const dpr   = Screen.devicePixelRatio || 1
+                        const overs = 2.0
+
+                        if (ctx.resetTransform) ctx.resetTransform()
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.scale(dpr * overs, dpr * overs)
+
+                        const w = width  / (dpr * overs)
+                        const h = height / (dpr * overs)
+
+                        // geometry (same as before)
+                        const cx   = w * 0.5
+                        const r    = w * 0.34           // bulb radius
+                        const cy   = r + h * 0.16       // bulb center y
+                        const tipY = h * 0.98           // sharp tip
+                        const k    = 1.75               // side curve depth
+
+                        ctx.lineJoin = "round"
+                        ctx.lineCap  = "round"
+
+                        // pin body (watertight teardrop)
+                        ctx.beginPath()
+                        ctx.moveTo(cx + r, cy)                  // start at rightmost
+                        ctx.arc(cx, cy, r, 0, Math.PI, true)    // over the top to leftmost
+                        ctx.quadraticCurveTo(cx - r * 0.30, cy + r * k, cx, tipY)
+                        ctx.quadraticCurveTo(cx + r * 0.30, cy + r * k, cx + r, cy)
+                        ctx.closePath()
+
+                        ctx.fillStyle = pinRoot.pinColor
+                        ctx.fill()
+                        ctx.lineWidth   = Math.max(1, r * 0.10)
+                        ctx.strokeStyle = pinRoot.pinStroke
+                        ctx.stroke()
+
+                        const badgeR = r * 0.75;                 // was r * 0.46
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, badgeR, 0, Math.PI * 2, false);
+                        ctx.fillStyle = "white";
+                        ctx.fill();
+                        ctx.lineWidth   = Math.max(1, r * 0.06);
+                        ctx.strokeStyle = "black";
+                        ctx.stroke();
+
+                        // --- centered number with explicit width-based centering ---
+                        const text   = String(pinRoot.ratingVal);
+                        const fontPx = Math.round(badgeR * 1.40);
+                        ctx.font = fontPx + "px sans-serif";
+                        ctx.fillStyle = "black";
+                        ctx.textBaseline = "middle";   // vertical center
+                        ctx.textAlign = "left";        // we'll position X manually
+
+                        // measure width in current transform (scaled context)
+                        let tw = 0;
+                        try { tw = ctx.measureText(text).width || 0; } catch (e) { tw = 0; }
+
+                        // small optical vertical nudge
+                        const yNudge = Math.round(fontPx * 0.06);
+
+                        // optional tiny per-digit horizontal tweak (helps "1")
+                        let xNudge = 0;
+                        if (text === "1") xNudge = -fontPx * 0.08;
+
+                        // center by hand using measured width
+                        const tx = cx - (tw / 2) + xNudge;
+                        ctx.fillText(text, tx, cy + yNudge);
+                    }
+
+                    Component.onCompleted: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                }
+
+                // keep your original offset so the tip points to the map coordinate
+                x: -width / 2
+                y: -height
+
+                // MouseArea {
+                //     anchors.fill: parent
+                //     onClicked: {
+                //         console.log("ICON PRESSED")
+                //         historyItemData = historyDropPoints.dummyModel[index]
+                //         historyItemData.index = index
+                //         mainWindow.showPopupDialogFromComponent(historyItemPopUp)
+                //     }
+                // }
+            }
+
+
+        }
+
+        onModelChanged: {
+            console.log("Model updated", model);
+            historyDropPoints.dummyModel = backend.dropPoints
+        }
+    }
+
+    // Component {
+    //     id: historyItemPopUp
+
+    //     QGCPopupDialog {
+    //         id:         historyItemPopUpDialog
+    //         title:      qsTr(historyItemData.label)
+    //         buttons:    StandardButton.Close
+
+    //         ColumnLayout {
+    //             //spacing: _margins
+
+    //             GridLayout {
+    //                 id:     gridLayout
+    //                 flow:   GridLayout.TopToBottom
+    //                 rows:   3
+
+    //                 QGCLabel {
+    //                     text:               qsTr("Drop Point Rating:")
+    //                     visible:            true
+    //                     //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+    //                 }
+
+
+    //                 QGCLabel {
+    //                     text:               "Times used:"
+    //                     visible:            true
+    //                     //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+    //                 }
+
+    //                 QGCLabel {
+    //                     text:               "GPS Coodinates:"
+    //                     visible: true
+    //                 }
+
+    //                 QGCButton {
+    //                     text: "Use again"
+    //                     enabled: globals.activeVehicle && globals.activeVehicle.coordinate.isValid
+    //                     onClicked:{
+    //                         if(globals.activeVehicle && globals.activeVehicle.coordinate.isValid){
+    //                             historyItemPopUpDialog.hideDialog()
+    //                             insertSimpleItemAfterCurrent(QtPositioning.coordinate(historyItemData.lat, historyItemData.lon))
+    //                         }
+    //                     }
+    //                 }
+
+
+    //                 RowLayout {
+    //                     id: ratingRow
+    //                     spacing: 8
+
+    //                     RowLayout {
+    //                         id: starBar
+    //                         property int maxStars: 5
+    //                         // Don't rely on a non-notifyable binding; seed once:
+    //                         property int value: historyItemData.rating
+    //                         readonly property string starIcon: "/InstrumentValueIcons/star-full.svg"
+
+    //                         function setRating(v) {
+    //                             var nv = Math.max(0, Math.min(maxStars, v))
+    //                             if (value === nv && historyItemData.rating === nv) return
+
+    //                             // 1) update local reactive value so UI changes immediately
+    //                             value = nv
+
+    //                             // 2) keep your data + backend in sync
+    //                             historyItemData.rating = nv
+    //                             rating.text = nv
+    //                             backend.changeRating(historyItemData.index, nv)
+    //                         }
+
+    //                         // 3) if rating can change from outside (after save/load), resync UI:
+    //                         Connections {
+    //                             target: backend
+    //                             onDropPointsChanged: {
+    //                                 // pull fresh value from your item, then reflect locally
+    //                                 starBar.value = historyItemData.rating
+    //                             }
+    //                         }
+
+    //                         spacing: 6
+
+    //                         Repeater {
+    //                             model: starBar.maxStars
+    //                             delegate: Item {
+    //                                 width: 40; height: 40
+    //                                 property int starIndex: index + 1
+
+    //                                 QGCColoredImage {
+    //                                     anchors.fill: parent
+    //                                     source: starBar.starIcon
+    //                                     fillMode: Image.PreserveAspectFit
+    //                                     // Drive transparency via color alpha (reliably updates)
+    //                                     color: starBar.value >= starIndex ? Qt.rgba(0.4, 0.4, 0.4, 0.3) : Qt.rgba(0, 0, 0, 1)
+    //                                 }
+    //                                 MouseArea {
+    //                                     anchors.fill: parent
+    //                                     onClicked: starBar.setRating(starIndex)
+    //                                     hoverEnabled: true
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+
+    //                     QGCLabel {
+    //                         id: rating
+    //                         text: historyItemData.rating
+    //                         visible: true
+    //                     }
+    //                 }
+
+    //                 QGCLabel {
+    //                     text:               historyItemData.counter
+    //                     visible:            true
+    //                 }
+
+    //                 QGCLabel {
+    //                     text: historyItemData.lat + " " + historyItemData.lon
+    //                 }
+
+    //                 QGCButton {
+    //                     text: "Remove Drop point"
+    //                     onClicked:{
+    //                         backend.removeDropPoint(historyItemData.index)
+    //                         historyItemPopUpDialog.hideDialog()
+    //                     }
+    //                 }
+    //                 // QGCButton {
+    //                 //     text: "Change rating"
+    //                 // }
+
+    //             }
+    //         }
+    //     }
+    // }
+
     MapScale {
         id:                 mapScale
         anchors.margins:    _toolsMargin
-        anchors.left:       parent.left
+        anchors.right:       parent.right
         anchors.top:        parent.top
         mapControl:         _root
         buttonsOnLeft:      false

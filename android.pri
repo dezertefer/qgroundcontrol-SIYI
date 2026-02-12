@@ -52,4 +52,6 @@ DISTFILES += \
     $$PWD/android/res/values/libs.xml \
     $$PWD/android/build.gradle \
     $$PWD/android/gradle/wrapper/gradle-wrapper.properties \
-    $$PWD/android/gradlew.bat
+    $$PWD/android/gradlew.bat \
+    $$PWD/android/src/org/mavlink/qgroundcontrol/BootReceiver.java \
+    $$PWD/android/src/org/mavlink/qgroundcontrol/BootStartService.java

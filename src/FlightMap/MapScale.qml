@@ -14,12 +14,15 @@ import QGroundControl                   1.0
 import QGroundControl.Controls          1.0
 import QGroundControl.ScreenTools       1.0
 import QGroundControl.SettingsManager   1.0
+import QGroundControl.Palette               1.0
 
 /// Map scale control
 Item {
     id:     scale
-    width:  buttonsOnLeft || !_zoomButtonsVisible ? rightEnd.x + rightEnd.width : zoomDownButton.x + zoomDownButton.width
+    width:  buttonsOnLeft || !_zoomButtonsVisible ? rightEnd.x + rightEnd.width + mapTypeButton.width + historyButton.width : zoomDownButton.x + zoomDownButton.width + mapTypeButton.width
     height: rightEnd.y + rightEnd.height
+
+    QGCPalette { id: qgcPal}
 
     property var    mapControl                      ///< Map control for which this scale control is being used
     property bool   terrainButtonVisible:   false
@@ -81,7 +84,8 @@ Item {
                 }
             }
             if (scaleLineRatio === 0) {
-                scaleLineRatio = scaleLineMeters / _scaleLengthsMeters[i]
+                // Fallback to last entry, same direction: nice / measured
+                scaleLineRatio = _scaleLengthsMeters[i] / scaleLineMeters
                 scaleLineMeters = _scaleLengthsMeters[i]
             }
         }
@@ -106,7 +110,7 @@ Item {
                 }
             }
             if (scaleLineRatio === 0) {
-                scaleLineRatio = scaleLineFeet / _scaleLengthsFeet[i]
+                scaleLineRatio = _scaleLengthsFeet[i] / scaleLineFeet
                 scaleLineFeet = _scaleLengthsFeet[i]
             }
         }
@@ -116,9 +120,10 @@ Item {
         scaleText.text = text
     }
 
+
     function calculateScale() {
         if(mapControl) {
-            var scaleLinePixelLength = 100
+            var scaleLinePixelLength = 400
             var leftCoord  = mapControl.toCoordinate(Qt.point(0, scale.y), false /* clipToViewPort */)
             var rightCoord = mapControl.toCoordinate(Qt.point(scaleLinePixelLength, scale.y), false /* clipToViewPort */)
             var scaleLineMeters = Math.round(leftCoord.distanceTo(rightCoord))
@@ -151,6 +156,7 @@ Item {
         font.family:        ScreenTools.demiboldFontFamily
         anchors.left:       parent.left
         anchors.right:      rightEnd.right
+        //anchors.top:        historyButton.top
         horizontalAlignment:Text.AlignRight
         text:               "0 m"
     }
@@ -163,7 +169,7 @@ Item {
                                 (_zoomButtonsVisible ? zoomDownButton.right : (terrainButtonVisible ? terrainButton.right : parent.left)) :
                                 parent.left
         width:              2
-        height:             ScreenTools.defaultFontPixelHeight
+        height:             ScreenTools.defaultFontPixelHeight*2
         color:              _color
     }
 
@@ -181,20 +187,22 @@ Item {
         anchors.top:        leftEnd.top
         anchors.left:       centerLine.right
         width:              2
-        height:             ScreenTools.defaultFontPixelHeight
+        height:             ScreenTools.defaultFontPixelHeight*2
         color:              _color
     }
 
     QGCButton {
         id:                 mapTypeButton
-        anchors.top:        scaleText.top
+        //anchors.top:        scaleText.top
         anchors.bottom:     rightEnd.bottom
         anchors.leftMargin: buttonsOnLeft ? 0 : ScreenTools.defaultFontPixelWidth / 2
         anchors.left:       buttonsOnLeft ? parent.left : rightEnd.right
         text:               qsTr("M")
         width:              height
+        height:             ScreenTools.defaultFontPixelHeight*3
         opacity:            0.75
         visible:            true
+        mapScaleButton:     true
         onClicked:
         {
            if (QGroundControl.settingsManager.flightMapSettings.mapProvider.rawValue === "Bing")
@@ -206,7 +214,7 @@ Item {
            else
            {
                QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Bing"
-               QGroundControl.settingsManager.flightMapSettings.mapType.value="Satellite"
+               QGroundControl.settingsManager.flightMapSettings.mapType.value="Hybrid"
                //mapButton = true
            }
                //console.log("123")
@@ -219,6 +227,25 @@ Item {
             QGroundControl.settingsManager.flightMapSettings.mapType.value=QGroundControl.mapEngineManager.mapTypeList("Geoserver")[0]
 
         }*/
+    }
+
+    QGCButton {
+        id: historyButton
+        //anchors.top:        scaleText.top
+        anchors.bottom:     rightEnd.bottom
+        anchors.leftMargin: buttonsOnLeft ? 0 : ScreenTools.defaultFontPixelWidth / 2
+        anchors.left:       buttonsOnLeft ? parent.left : mapTypeButton.right
+        text:               qsTr("H")
+        width:              height
+        height:             ScreenTools.defaultFontPixelHeight*3
+        opacity:            0.75
+        visible:            true
+        mapScaleButton:     true
+        historyButton:      true
+        //color:              QGroundControl.settingsManager.flightMapSettings.enableHistory.value ? qgcPal.buttonHighlight : qgcPal.button
+        onClicked:{
+            QGroundControl.settingsManager.flightMapSettings.enableHistory.value = !QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+        }
     }
 
     QGCButton {

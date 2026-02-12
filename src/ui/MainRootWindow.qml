@@ -31,11 +31,96 @@ ApplicationWindow {
     visible:        true
 
 
+    // Item {
+    //     id: audioPlayer
+    //     property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
+    //     property var servo1: vehicle && vehicle.actuatorOutputs ? vehicle.actuatorOutputs.pwm1 : null
+    //     property var oldServo9:0
+
+    //     Audio {
+    //         id: servo1Sound
+    //         source: "qrc:/res/audio/src/Fishing_line_released_NZ_female.mp3"
+    //         volume: 1.0
+    //     }
+
+    //     Timer {
+    //         interval: 1000
+    //         running: true
+    //         repeat: true
+    //         onTriggered: {
+    //             if (!QGroundControl.multiVehicleManager.activeVehicle)
+    //                 return
+
+    //             var grp = QGroundControl.multiVehicleManager.activeVehicle.actuatorOutputs
+    //             if (!grp) {
+    //                 console.log("[servo] no actuatorOutputs group yet")
+    //                 return
+    //             }
+
+    //             // We only care about CH9
+    //             let fact = grp.pwmFact ? grp.pwmFact(9) : (grp["pwm9"] || null)
+    //             let pwm  = fact ? fact.rawValue : 0
+
+    //             //console.log("[servo] ch9 pwm:", pwm, "old:", audioPlayer.oldServo9)
+
+    //             // Ignore 0 / invalid values
+    //             if (pwm === 0)
+    //                 return
+
+    //             // First valid sample: just store baseline, don't trigger
+    //             if (audioPlayer.oldServo9 === 0 || audioPlayer.oldServo9 === undefined) {
+    //                 audioPlayer.oldServo9 = pwm
+    //                 return
+    //             }
+
+    //             if (pwm !== audioPlayer.oldServo9) {
+    //                 // Was outside 1000–1250, now inside -> trigger
+    //                 const wasOut = (audioPlayer.oldServo9 < 1000 || audioPlayer.oldServo9 >= 1250)
+    //                 const nowIn  = (pwm > 1000 && pwm < 1250)
+
+    //                 if (wasOut && nowIn) {
+    //                     console.log("WORKED! edge into window")
+    //                     if (!QGroundControl.settingsManager.appSettings.audioMuted.rawValue){
+    //                         servo1Sound.play()
+    //                     }
+    //                     if (globals.activeVehicle && globals.activeVehicle.coordinate.isValid && globals.activeVehicle.flying) {
+    //                         const c = globals.activeVehicle.coordinate
+    //                         backend.addDropPoint("Point", c.latitude, c.longitude)
+    //                         console.log("[drop] saved drop point at", c.latitude, c.longitude)
+    //                     } else {
+    //                         console.log("[drop] cannot save drop point: no valid activeVehicle coordinate")
+    //                     }
+    //                 }
+
+    //                 audioPlayer.oldServo9 = pwm
+    //             }
+    //         }
+    //     }
+    // }
+
     Item {
         id: audioPlayer
+
         property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
-        property var servo1: vehicle && vehicle.actuatorOutputs ? vehicle.actuatorOutputs.pwm1 : null
-        property var oldServo9:0
+        property var oldServo9: 0
+
+        // --- helpers ---
+        function deg2rad(deg) {
+            return deg * Math.PI / 180.0
+        }
+
+        function distanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000.0
+            const dLat = deg2rad(lat2 - lat1)
+            const dLon = deg2rad(lon2 - lon1)
+
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        }
 
         Audio {
             id: servo1Sound
@@ -47,47 +132,78 @@ ApplicationWindow {
             interval: 1000
             running: true
             repeat: true
+
             onTriggered: {
-                if (!QGroundControl.multiVehicleManager.activeVehicle)
+                if (!audioPlayer.vehicle)
                     return
 
-                var grp = QGroundControl.multiVehicleManager.activeVehicle.actuatorOutputs
-                if (!grp) {
+                const actuatorOutputs = audioPlayer.vehicle.actuatorOutputs
+                if (!actuatorOutputs) {
                     console.log("[servo] no actuatorOutputs group yet")
                     return
                 }
 
-                // We only care about CH9
-                let fact = grp.pwmFact ? grp.pwmFact(9) : (grp["pwm9"] || null)
-                let pwm  = fact ? fact.rawValue : 0
+                // CH9 only
+                const pwmFact = actuatorOutputs.pwmFact
+                                 ? actuatorOutputs.pwmFact(9)
+                                 : (actuatorOutputs["pwm9"] || null)
 
-                //console.log("[servo] ch9 pwm:", pwm, "old:", audioPlayer.oldServo9)
-
-                // Ignore 0 / invalid values
+                const pwm = pwmFact ? pwmFact.rawValue : 0
                 if (pwm === 0)
                     return
 
-                // First valid sample: just store baseline, don't trigger
+                // First valid sample → baseline only
                 if (audioPlayer.oldServo9 === 0 || audioPlayer.oldServo9 === undefined) {
                     audioPlayer.oldServo9 = pwm
                     return
                 }
 
                 if (pwm !== audioPlayer.oldServo9) {
-                    // Was outside 1000–1250, now inside -> trigger
-                    const wasOut = (audioPlayer.oldServo9 < 1000 || audioPlayer.oldServo9 >= 1250)
-                    const nowIn  = (pwm > 1000 && pwm < 1250)
+                    const wasOut = (audioPlayer.oldServo9 < 900 || audioPlayer.oldServo9 >= 1400)
+                    const nowIn  = (pwm > 900 && pwm < 1400)
 
                     if (wasOut && nowIn) {
-                        console.log("WORKED! edge into window")
-                        servo1Sound.play()
 
-                        if (globals.activeVehicle && globals.activeVehicle.coordinate.isValid && globals.activeVehicle.flying) {
-                            const c = globals.activeVehicle.coordinate
-                            backend.addDropPoint("Point", c.latitude, c.longitude)
-                            console.log("[drop] saved drop point at", c.latitude, c.longitude)
+                        const currentCoordinate = audioPlayer.vehicle.coordinate
+                        const homeCoordinate    = audioPlayer.vehicle.homePosition
+
+                        let allowTrigger = false
+
+                        if (currentCoordinate && currentCoordinate.isValid &&
+                            homeCoordinate && homeCoordinate.isValid) {
+
+                            const dist = audioPlayer.distanceMeters(
+                                currentCoordinate.latitude,
+                                currentCoordinate.longitude,
+                                homeCoordinate.latitude,
+                                homeCoordinate.longitude
+                            )
+
+                            allowTrigger = (dist >= 30.0)
+                            // console.log("[drop] distance to home:", dist.toFixed(1), "m")
                         } else {
-                            console.log("[drop] cannot save drop point: no valid activeVehicle coordinate")
+                            console.log("[drop] missing valid current/home coordinate")
+                        }
+
+                        if (!QGroundControl.settingsManager.appSettings.audioMuted.rawValue) {
+                            servo1Sound.play()
+                        }
+
+                        if (allowTrigger) {
+                            console.log("WORKED! edge into window (30m+ from home)")
+
+                            if (audioPlayer.vehicle.flying) {
+                                backend.addDropPoint(
+                                    "Point",
+                                    currentCoordinate.latitude,
+                                    currentCoordinate.longitude
+                                )
+                                console.log("[drop] saved drop point at",
+                                            currentCoordinate.latitude,
+                                            currentCoordinate.longitude)
+                            }
+                        } else {
+                            console.log("[drop] ignored: too close to home")
                         }
                     }
 
@@ -96,6 +212,7 @@ ApplicationWindow {
             }
         }
     }
+
 
     Component.onCompleted: {
         //-- Full screen on mobile or tiny screens

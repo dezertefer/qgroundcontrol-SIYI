@@ -43,7 +43,7 @@ public:
     void setEnabled             (bool enabled);
     void setVisible             (bool visible);
     void setCheckable           (bool checkable);
-    void setChecked             (bool checked);
+    Q_INVOKABLE    void setChecked  (bool checked);
     void setShowAlternateIcon   (bool showAlternateIcon);
     void setText                (const QString& text);
     void setIconSource          (const QString& iconSource);

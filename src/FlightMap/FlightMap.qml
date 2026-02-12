@@ -9,19 +9,26 @@
 
 import QtQuick          2.3
 import QtQuick.Controls 1.2
-import QtLocation       5.3
-import QtPositioning    5.3
 import QtQuick.Dialogs  1.2
+import QtLocation       5.15
+import QtPositioning    5.15
+import QtQuick.Layouts  1.2
+import QtQuick.Window   2.2
+import QtGraphicalEffects 1.12
 
-import QGroundControl                       1.0
-import QGroundControl.FactSystem            1.0
-import QGroundControl.Controls              1.0
-import QGroundControl.FlightMap             1.0
-import QGroundControl.ScreenTools           1.0
-import QGroundControl.MultiVehicleManager   1.0
-import QGroundControl.Vehicle               1.0
-import QGroundControl.QGCPositionManager    1.0
+import QGroundControl                   1.0
+import QGroundControl.FlightMap         1.0
+import QGroundControl.ScreenTools       1.0
+import QGroundControl.Controls          1.0
+import QGroundControl.FactSystem        1.0
+import QGroundControl.FactControls      1.0
+import QGroundControl.Palette           1.0
+import QGroundControl.Controllers       1.0
+import QGroundControl.ShapeFileHelper   1.0
+import QGroundControl.Airspace          1.0
+import QGroundControl.Airmap            1.0
 
+import io.qt.examples.backend           1.0
 Map {
     id: _map
 
@@ -47,6 +54,8 @@ Map {
 
     property var    _activeVehicle:             QGroundControl.multiVehicleManager.activeVehicle
     property var    _activeVehicleCoordinate:   _activeVehicle ? _activeVehicle.coordinate : QtPositioning.coordinate()
+
+
 
     function setVisibleRegion(region) {
         // TODO: Is this still necessary with Qt 5.11?
@@ -117,6 +126,8 @@ Map {
         function onRawValueChanged() { updateActiveMapType() }
     }
 
+
+
     /// Ground Station location
     MapQuickItem {
         anchorPoint.x:  sourceItem.width / 2
@@ -139,4 +150,48 @@ Map {
             }
         }
     }
+    // Trapezium "map type" badge — RIGHT side, rotated trapezium
+    // Right-side map type label (rectangle)
+    Rectangle {
+        id: mapTypeBadge
+        width: 80
+        height: 250
+        radius: 15
+        z: 9999
+
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.rightMargin: 1
+
+        color: Qt.rgba(0, 0, 0, 0.55)
+        border.color: Qt.rgba(1, 1, 1, 0.35)
+        border.width: 1
+
+        property string _provider:
+            QGroundControl.settingsManager.flightMapSettings.mapProvider.value
+
+        property string _labelText:
+            (_provider === "Geoserver") ? qsTr("Marine map")
+          : (_provider === "Bing")      ? qsTr("Regular map")
+          : qsTr("Map")
+
+        Text {
+            text: mapTypeBadge._labelText
+            color: "white"
+            font.pixelSize: 35
+            font.bold: true
+
+            anchors.centerIn: parent
+
+            // Bottom → top
+            rotation: -90
+            transformOrigin: Item.Center
+
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.NoWrap
+        }
+    }
+
+
 } // Map

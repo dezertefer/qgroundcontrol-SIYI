@@ -39,7 +39,8 @@ public:
     DEFINE_SETTINGFACT(newProfileTakeOffSpeed)
     DEFINE_SETTINGFACT(dropPointSelected)
     DEFINE_SETTINGFACT(newProfileCableLength)
-
-
-
+    DEFINE_SETTINGFACT(currentProfileDropAlt)
+    DEFINE_SETTINGFACT(newProfileDropAlt)
+    DEFINE_SETTINGFACT(currentProfileUseDropAlt)
+    DEFINE_SETTINGFACT(newProfileUseDropAlt)
 };

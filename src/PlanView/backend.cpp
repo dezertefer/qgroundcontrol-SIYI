@@ -234,6 +234,8 @@ void BackEnd::updateCurrentProfile (QString profile)
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->setRawValue(m_selectedProfile["angle"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->setRawValue(m_selectedProfile["takeOffSpeed"].toString());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->setRawValue(m_selectedProfile["cableLength"].toDouble());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileUseDropAlt()->setRawValue(m_selectedProfile["useDropAlt"].toBool());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileDropAlt()->setRawValue(m_selectedProfile["dropAlt"].toDouble());
 }
 
 void BackEnd::readJson ()
@@ -254,6 +256,8 @@ void BackEnd::readJson ()
         defaultProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawDefaultValue().toString());
         defaultProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawDefaultValue().toString());
         defaultProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toString());
+        defaultProfile.insert("useDropAlt", false);
+        defaultProfile.insert("dropAlt", 10.0);
 
         profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->rawDefaultValue().toString(),defaultProfile);
 
@@ -265,6 +269,8 @@ void BackEnd::readJson ()
         defaultProfile.insert("speed","6.9");
         defaultProfile.insert("takeOffSpeed","1.11");
         defaultProfile.insert("cableLength", "70.0");
+        defaultProfile.insert("useDropAlt", false);
+        defaultProfile.insert("dropAlt", 10.0);
 
         profilesList.insert("Rapid Launcher", defaultProfile);
 
@@ -276,6 +282,8 @@ void BackEnd::readJson ()
         defaultProfile.insert("speed","5.55");
         defaultProfile.insert("takeOffSpeed","1.11");
         defaultProfile.insert("cableLength", "70.0");
+        defaultProfile.insert("useDropAlt", false);
+        defaultProfile.insert("dropAlt", 10.0);
 
         profilesList.insert("Winch", defaultProfile);
 
@@ -287,6 +295,8 @@ void BackEnd::readJson ()
         defaultProfile.insert("speed","6.9");
         defaultProfile.insert("takeOffSpeed","1.67");
         defaultProfile.insert("cableLength", "70.0");
+        defaultProfile.insert("useDropAlt", false);
+        defaultProfile.insert("dropAlt", 10.0);
 
         profilesList.insert("Direct off sand", defaultProfile);
 
@@ -298,6 +308,8 @@ void BackEnd::readJson ()
         defaultProfile.insert("speed","5.55");
         defaultProfile.insert("takeOffSpeed","0.83");
         defaultProfile.insert("cableLength", "70.0");
+        defaultProfile.insert("useDropAlt", false);
+        defaultProfile.insert("dropAlt", 10.0);
 
         profilesList.insert("Winch clipping traces", defaultProfile);
 
@@ -347,7 +359,26 @@ void BackEnd::readJson ()
     QVariantMap root_map = root_obj.toVariantMap();
     m_root_map = root_map;
 
+    bool changed = false;
 
+    for (auto it = m_root_map.begin(); it != m_root_map.end(); ++it) {
+        QVariantMap p = it.value().toMap();
+
+        if (!p.contains("useDropAlt")) {
+            p.insert("useDropAlt", false);   // default: old behavior (no extra waypoint)
+            changed = true;
+        }
+        if (!p.contains("dropAlt")) {
+            p.insert("dropAlt", 10.0);       // default drop altitude
+            changed = true;
+        }
+
+        it.value() = p;
+    }
+
+    if (changed) {
+        writeJson(m_root_map);               // persist upgrade once
+    }
 
 
 
@@ -538,6 +569,8 @@ void BackEnd::editProfile (const QString &profile)
    currentProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toString());
    currentProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toString());
    currentProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toString());
+   currentProfile.insert("useDropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileUseDropAlt()->rawValue().toBool());
+   currentProfile.insert("dropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileDropAlt()->rawValue().toDouble());
 
    profilesList.insert(profile,currentProfile);
 
@@ -569,6 +602,8 @@ void BackEnd::setNewProfile(const QString &profile)
     newProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue().toString());
     newProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileTakeOffSpeed()->rawValue().toString());
     newProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileCableLength()->rawValue().toString());
+    newProfile.insert("useDropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileUseDropAlt()->rawValue().toBool());
+    newProfile.insert("dropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileDropAlt()->rawValue().toDouble());
 
     //profilesList.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(),newProfile);
     m_root_map.insert(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString(), newProfile);

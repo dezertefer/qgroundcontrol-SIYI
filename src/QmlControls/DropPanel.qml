@@ -30,9 +30,10 @@ Item {
     readonly property int dropUp:       3
     readonly property int dropDown:     4
 
-    readonly property real _arrowBaseHeight:    radius             // Height of vertical side of arrow
-    readonly property real _arrowPointWidth:    radius * 0.666     // Distance from vertical side to point
-    readonly property real _dropMargin:         ScreenTools.defaultFontPixelWidth
+    // Arrow is effectively removed by making its width 0
+    readonly property real _arrowBaseHeight:    radius
+    readonly property real _arrowPointWidth:    0
+    readonly property real _dropMargin:         ScreenTools.defaultFontPixelWidth * 0.6
 
     property var    _dropEdgeTopPoint
     property alias  _dropDownComponent: panelLoader.sourceComponent
@@ -42,8 +43,28 @@ Item {
     property var    _dropPanelCancel
     property var    _parentButton
 
+    QGCPalette { id: qgcPal }
+
+    // --- helpers for visual size of the loaded panel (logical width/height * its own scale) ---
+    function panelVisualWidth() {
+        if (!panelLoader.item)
+            return 0
+        var s = (panelLoader.item.scale !== undefined && panelLoader.item.scale !== null)
+                ? panelLoader.item.scale : 1
+        return panelLoader.item.width * s
+    }
+
+    function panelVisualHeight() {
+        if (!panelLoader.item)
+            return 0
+        var s = (panelLoader.item.scale !== undefined && panelLoader.item.scale !== null)
+                ? panelLoader.item.scale : 1
+        return panelLoader.item.height * s
+    }
+    // ---------------------------------------------------------------------
+
     function show(panelEdgeTopPoint, panelComponent, parentButton) {
-        _parentButton = parentButton
+        _parentButton     = parentButton
         _dropEdgeTopPoint = panelEdgeTopPoint
         _dropDownComponent = panelComponent
         _calcPositions()
@@ -61,33 +82,58 @@ Item {
     }
 
     function _calcPositions() {
+        if (!panelLoader.item)
+            return
+
         var panelComponentWidth  = panelLoader.item.width
         var panelComponentHeight = panelLoader.item.height
 
-        dropDownItem.width  = panelComponentWidth  + (_dropMargin * 2) + _arrowPointWidth
-        dropDownItem.height = panelComponentHeight + (_dropMargin * 2)
+        // Desired *visual* size (after all scaling) = content + margins
+        var rawWidth  = panelComponentWidth  + (_dropMargin * 2)
+        var rawHeight = panelComponentHeight + (_dropMargin * 2)
 
+        // Compensate ToolStrip scaling so background visually matches contents
+        var s = (toolStrip && toolStrip.scaleFactor) ? toolStrip.scaleFactor : 1.0
+
+        // In local coords of the scaled ToolStrip, we shrink width by 1/s
+        dropDownItem.width  = rawWidth  / s
+        dropDownItem.height = rawHeight
+
+        // --- VIEWPORT CLAMPING (height) ---
+        var maxAllowedHeight = _viewportMaxHeight
+        if (dropDownItem.height > maxAllowedHeight) {
+            dropDownItem.height = maxAllowedHeight
+        }
+
+        // --- HORIZONTAL POSITION: drop to the right of the buttons (same as before) ---
         dropDownItem.x = _dropEdgeTopPoint.x + _dropMargin
-        dropDownItem.y = _dropEdgeTopPoint.y -(dropDownItem.height / 2) + radius
 
-        // Validate that dropdown is within viewport
-        dropDownItem.y = Math.min(dropDownItem.y + dropDownItem.height, _viewportMaxBottom) - dropDownItem.height
-        dropDownItem.y = Math.max(dropDownItem.y, _viewportMaxTop)
+        // --- VERTICAL POSITION: bottom of panel ~ center of button, clamped to viewport ---
+        // Treat _dropEdgeTopPoint.y as the desired bottom anchor in parent coords
+        var desiredBottom = _dropEdgeTopPoint.y
+        var desiredTop    = desiredBottom - dropDownItem.height
 
-        // Adjust height to not exceed viewport bounds
-        dropDownItem.height = Math.min(dropDownItem.height, _viewportMaxHeight - dropDownItem.y)
+        // Clamp vertically to viewport
+        if (desiredTop < _viewportMaxTop) {
+            desiredTop    = _viewportMaxTop
+            desiredBottom = desiredTop + dropDownItem.height
+        }
+        if (desiredBottom > _viewportMaxBottom) {
+            desiredBottom = _viewportMaxBottom
+            desiredTop    = desiredBottom - dropDownItem.height
+        }
 
-        // Arrow points
-        arrowCanvas.arrowPoint.y = (_dropEdgeTopPoint.y + radius) - dropDownItem.y
+        dropDownItem.y = desiredTop
+
+        // Arrow points (no real arrow now, but keep for compatibility)
+        arrowCanvas.arrowPoint.y = (_dropEdgeTopPoint.y) - dropDownItem.y
         arrowCanvas.arrowPoint.x = 0
         arrowCanvas.arrowBase1.x = _arrowPointWidth
         arrowCanvas.arrowBase1.y = arrowCanvas.arrowPoint.y - (_arrowBaseHeight / 2)
         arrowCanvas.arrowBase2.x = arrowCanvas.arrowBase1.x
         arrowCanvas.arrowBase2.y = arrowCanvas.arrowBase1.y + _arrowBaseHeight
         arrowCanvas.requestPaint()
-    } // function - _calcPositions
-
-    QGCPalette { id: qgcPal }
+    }
 
     Component {
         // Overlay which is used to cancel the panel when the user clicks away
@@ -100,7 +146,7 @@ Item {
         }
     }
 
-    // This item is sized to hold the entirety of the drop panel including the arrow point
+    // This item is sized to hold the entirety of the drop panel (no arrow triangle anymore)
     Item {
         id: dropDownItem
 
@@ -117,25 +163,22 @@ Item {
             property point arrowBase2: Qt.point(0, 0)
 
             onPaint: {
-                var panelX = _arrowPointWidth
-                var panelY = 0
-                var panelWidth = parent.width - _arrowPointWidth
+                var panelX      = 0
+                var panelY      = 0
+                var panelWidth  = parent.width
                 var panelHeight = parent.height
 
                 var context = getContext("2d")
                 context.reset()
                 context.beginPath()
 
-                context.moveTo(panelX, panelY)                              // top left
-                context.lineTo(panelX + panelWidth, panelY)                 // top right
-                context.lineTo(panelX + panelWidth, panelX + panelHeight)   // bottom right
-                context.lineTo(panelX, panelY + panelHeight)                // bottom left
-                context.lineTo(arrowBase2.x, arrowBase2.y)
-                context.lineTo(arrowPoint.x, arrowPoint.y)
-                context.lineTo(arrowBase1.x, arrowBase1.y)
-                context.lineTo(panelX, panelY)                              // top left
-
+                // Simple rect background, no arrow
+                context.moveTo(panelX,               panelY)
+                context.lineTo(panelX + panelWidth,  panelY)
+                context.lineTo(panelX + panelWidth,  panelY + panelHeight)
+                context.lineTo(panelX,               panelY + panelHeight)
                 context.closePath()
+
                 context.fillStyle = qgcPal.windowShade
                 context.fill()
             }
@@ -144,11 +187,13 @@ Item {
         QGCFlickable {
             id:                 panelItemFlickable
             anchors.margins:    _dropMargin
-            anchors.leftMargin: _dropMargin + _arrowPointWidth
+            anchors.leftMargin: _dropMargin   // no arrow offset any more
             anchors.fill:       parent
             flickableDirection: Flickable.VerticalFlick
-            contentWidth:       panelLoader.width
-            contentHeight:      panelLoader.height
+
+            // Use visual size of content for scroll area
+            contentWidth:       panelVisualWidth()
+            contentHeight:      panelVisualHeight()
 
             Loader {
                 id: panelLoader

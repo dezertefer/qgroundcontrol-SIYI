@@ -7,7 +7,7 @@
  *
  ****************************************************************************/
 
-import QtQuick          2.3
+import QtQuick          2.15
 import QtQuick.Controls 1.2
 import QtQuick.Dialogs  1.2
 import QtLocation       5.15
@@ -63,8 +63,10 @@ Item {
     property bool   _isEdit:                            false
     property bool   _isNew:                             false
     property bool   _isDel:                             false
-    property var    historyItemData
+    property var    _newDropPointCoord:                 QtPositioning.coordinate()
     //property var    pointToAdd: {"lat": 0 , "lon":0}
+
+    property var    historyItemData
 
     readonly property var       _layers:                [_layerMission, _layerGeoFence, _layerRallyPoints]
 
@@ -532,16 +534,61 @@ Item {
                 _setLastItemAltRel(haulRel)
             }
 
-            // (5) B (drop point) at haul altitude
-            _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
-            _setLastItemAltRel(haulRel)
+            // ---- descend-to-drop logic ----
+            var useDropAlt = Boolean(_planViewSettings.currentProfileUseDropAlt.rawValue)
+            var dropAltRel = Number(_planViewSettings.currentProfileDropAlt.rawValue)
+            if (!isFinite(dropAltRel) || dropAltRel <= 0) dropAltRel = 10.0
+                if (useDropAlt) {
+                var descentAngleDeg = 45.0    // TODO: tune later (shallower -> needs more distance)
+                var descentAngleRad = descentAngleDeg * Math.PI / 180
+                var margin = 5.0              // meters safety margin
 
-            // (6) DO_SET_SERVO
+                // prevHigh is the last "haul altitude" coordinate before approaching B
+                // If C wasn't inserted, we approach from D.
+                var prevHigh = coordsAlmostEqual(backend.D, backend.C) ? backend.D : backend.C
+
+                // distance from prevHigh -> B
+                var segmentDist = prevHigh.distanceTo(coordinate)
+
+                // how much vertical drop we need (REL)
+                var verticalDrop = Math.max(0, haulRel - dropAltRel)
+
+                // how much horizontal distance is needed to do that drop at the chosen descent angle
+                var needHoriz = 0
+                if (verticalDrop > 0.01 && Math.abs(Math.tan(descentAngleRad)) > 1e-6) {
+                    needHoriz = verticalDrop / Math.tan(descentAngleRad)
+                }
+
+                // (5) either:
+                //   - insert P@haul then B@dropAlt, OR
+                //   - if not enough distance, go straight to B@haul like before
+                if (needHoriz > 1.0 && segmentDist >= (needHoriz + margin)) {
+                    // compute point P which is "needHoriz" meters BEFORE B towards prevHigh
+                    var azBack = coordinate.azimuthTo(prevHigh)
+                    var pCoord = coordinate.atDistanceAndAzimuth(needHoriz, azBack)
+
+                    // P at haul altitude (REL)
+                    _missionController.insertSimpleMissionItem(toRelative(pCoord), nextIndex++, true)
+                    _setLastItemAltRel(haulRel)
+
+                    // B at drop altitude (REL 10m)
+                    _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
+                    _setLastItemAltRel(dropAltRel)
+                }else{
+                    _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
+                    _setLastItemAltRel(haulRel)
+                }
+            }else {
+                // fallback: old behavior (B at haul altitude)
+                    _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
+                    _setLastItemAltRel(haulRel)
+            }
+
+            // (6) DO_SET_SERVO (drop) at B
             _missionController.insertSimpleMissionItemServo(coordinate, nextIndex++, false)
 
             // (7) LAND back at A
             _missionController.insertLandItem(vehicleCoordinate, nextIndex++, false)
-
             // bookkeeping
             globals.pointToAdd.lat = coordinate.latitude
             globals.pointToAdd.lon = coordinate.longitude
@@ -707,14 +754,41 @@ Item {
 
             MouseArea {
                 anchors.fill: parent
-                onClicked: {
-                    // Take focus to close any previous editing
+
+                pressAndHoldInterval: 2000   // 2 seconds
+                property bool _didLongPress: false
+
+                onPressed: _didLongPress = false
+
+                onPressAndHold: {
+                    _didLongPress = true
+
                     editorMap.focus = true
-                    var coordinate = editorMap.toCoordinate(Qt.point(mouse.x, mouse.y), false /* clipToViewPort */)
-                    coordinate.latitude = coordinate.latitude.toFixed(_decimalPlaces)
-                    coordinate.longitude = coordinate.longitude.toFixed(_decimalPlaces)
-                    coordinate.altitude = coordinate.altitude.toFixed(_decimalPlaces)
-                    //console.log("ssssss")
+                    var coordinate = editorMap.toCoordinate(Qt.point(mouse.x, mouse.y), false)
+
+                    // Keep them numeric (toFixed returns a string)
+                    coordinate.latitude  = Number(coordinate.latitude.toFixed(_decimalPlaces))
+                    coordinate.longitude = Number(coordinate.longitude.toFixed(_decimalPlaces))
+                    coordinate.altitude  = Number(coordinate.altitude.toFixed(_decimalPlaces))
+
+                    // do your long-press action here
+                    // e.g. openHistory() or show a context menu
+                    //openHistory()
+                    _newDropPointCoord = coordinate
+                    mainWindow.showPopupDialogFromComponent(addDropPointPopUp)
+                    //mainWindow.showPopupDialog(addDropPointPopUpDialog, editorMap)
+                }
+
+                onClicked: {
+                    if (_didLongPress) return
+
+                    editorMap.focus = true
+                    var coordinate = editorMap.toCoordinate(Qt.point(mouse.x, mouse.y), false)
+
+                    coordinate.latitude  = Number(coordinate.latitude.toFixed(_decimalPlaces))
+                    coordinate.longitude = Number(coordinate.longitude.toFixed(_decimalPlaces))
+                    coordinate.altitude  = Number(coordinate.altitude.toFixed(_decimalPlaces))
+
                     switch (_editingLayer) {
                     case _layerMission:
                         if (addWaypointRallyPointAction.checked) {
@@ -723,9 +797,8 @@ Item {
                             insertROIAfterCurrent(coordinate)
                             _addROIOnClick = false
                         } else if (history.checked) {
-                            openHistory();
+                            openHistory()
                         }
-
                         break
                     case _layerRallyPoints:
                         if (_rallyPointController.supported && addWaypointRallyPointAction.checked) {
@@ -736,109 +809,11 @@ Item {
                 }
             }
 
-            // Add the mission item visuals to the map
-            Repeater {
-                model: _missionController.visualItems
-                delegate: MissionItemMapVisual {
-                    map:         editorMap
-                    onClicked:
-                    {
-                        if (sequenceNumber === 7 )
-                        {
-                        _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
-                        }
-                    }
-                    opacity:     _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
-                    interactive: _editingLayer == _layerMission
-                    vehicle:     _planMasterController.controllerVehicle
-                }
-            }
-
-            // Add lines between waypoints
-            MissionLineView {
-                showSpecialVisual:  _missionController.isROIBeginCurrentItem
-                model:              _missionController.simpleFlightPathSegments
-                opacity:            _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
-            }
-
-            // Direction arrows in waypoint lines
-            MapItemView {
-                model: _editingLayer == _layerMission ? _missionController.directionArrows : undefined
-
-                delegate: MapLineArrow {
-                    fromCoord:      object ? object.coordinate1 : undefined
-                    toCoord:        object ? object.coordinate2 : undefined
-                    arrowPosition:  3
-                    z:              QGroundControl.zOrderWaypointLines + 1
-                }
-            }
-
-            // Incomplete segment lines
-            MapItemView {
-                model: _missionController.incompleteComplexItemLines
-
-                delegate: MapPolyline {
-                    path:       [ object.coordinate1, object.coordinate2 ]
-                    line.width: 1
-                    line.color: "red"
-                    z:          QGroundControl.zOrderWaypointLines
-                    opacity:    _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
-                }
-            }
-
-            // UI for splitting the current segment
-            MapQuickItem {
-                id:             splitSegmentItem
-                anchorPoint.x:  sourceItem.width / 2
-                anchorPoint.y:  sourceItem.height / 2
-                z:              QGroundControl.zOrderWaypointLines + 1
-                visible:         false//_editingLayer == _layerMission
-
-                sourceItem: SplitIndicator {
-                    onClicked:  _missionController.insertSimpleMissionItem(splitSegmentItem.coordinate,
-                                                                           _missionController.currentPlanViewVIIndex,
-                                                                           true /* makeCurrentItem */)
-                }
-
-                function _updateSplitCoord() {
-                    if (_missionController.splitSegment) {
-                        var distance = _missionController.splitSegment.coordinate1.distanceTo(_missionController.splitSegment.coordinate2)
-                        var azimuth = _missionController.splitSegment.coordinate1.azimuthTo(_missionController.splitSegment.coordinate2)
-                        splitSegmentItem.coordinate = _missionController.splitSegment.coordinate1.atDistanceAndAzimuth(distance / 2, azimuth)
-                    } else {
-                        coordinate = QtPositioning.coordinate()
-                    }
-                }
-
-                Connections {
-                    target:                 _missionController
-                    function onSplitSegmentChanged()  { splitSegmentItem._updateSplitCoord() }
-                }
-
-                Connections {
-                    target:                 _missionController.splitSegment
-                    function onCoordinate1Changed()   { splitSegmentItem._updateSplitCoord() }
-                    function onCoordinate2Changed()   { splitSegmentItem._updateSplitCoord() }
-                }
-            }
-
-            // Add the vehicles to the map
-            MapItemView {
-                model: QGroundControl.multiVehicleManager.vehicles
-                delegate: VehicleMapItem {
-                    vehicle:        object
-                    coordinate:     object.coordinate
-                    map:            editorMap
-                    size:           ScreenTools.defaultFontPixelHeight * 3
-                    z:              QGroundControl.zOrderMapItems - 1
-                }
-            }
-
             MapItemView {
                 id: historyDropPoints
                 model: backend.dropPoints
                 property var dummyModel : backend.dropPoints
-                visible: false
+                visible: QGroundControl.settingsManager.flightMapSettings.enableHistory.value
                 delegate: MapQuickItem {
                     coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
 
@@ -947,6 +922,7 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
+                                console.log("ICON PRESSED")
                                 historyItemData = historyDropPoints.dummyModel[index]
                                 historyItemData.index = index
                                 mainWindow.showPopupDialogFromComponent(historyItemPopUp)
@@ -962,6 +938,352 @@ Item {
                     historyDropPoints.dummyModel = backend.dropPoints
                 }
             }
+
+            Component {
+                id: historyItemPopUp
+
+                QGCPopupDialog {
+                    id:         historyItemPopUpDialog
+                    title:      qsTr(historyItemData.label)
+                    buttons:    StandardButton.Close
+
+                    ColumnLayout {
+                        //spacing: _margins
+
+                        GridLayout {
+                            id:     gridLayout
+                            flow:   GridLayout.TopToBottom
+                            rows:   4
+
+                            QGCLabel {
+                                text:               qsTr("Drop Point Rating:")
+                                visible:            true
+                                //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                            }
+
+
+                            QGCLabel {
+                                text:               "Times used:"
+                                visible:            true
+                                //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
+                            }
+
+                            QGCLabel {
+                                text:               "GPS Coodinates:"
+                                visible: true
+                            }
+
+                            QGCButton {
+                                text: "Use again"
+                                enabled: globals.activeVehicle && globals.activeVehicle.coordinate.isValid
+                                onClicked:{
+                                    if(globals.activeVehicle && globals.activeVehicle.coordinate.isValid){
+                                        historyItemPopUpDialog.hideDialog()
+                                        insertSimpleItemAfterCurrent(QtPositioning.coordinate(historyItemData.lat, historyItemData.lon))
+                                    }
+                                }
+                            }
+
+
+                            RowLayout {
+                                id: ratingRow
+                                spacing: 8
+
+                                RowLayout {
+                                    id: starBar
+                                    property int maxStars: 5
+                                    // Don't rely on a non-notifyable binding; seed once:
+                                    property int value: historyItemData.rating
+                                    readonly property string starIcon: "/InstrumentValueIcons/star-full.svg"
+
+                                    function setRating(v) {
+                                        var nv = Math.max(0, Math.min(maxStars, v))
+                                        if (value === nv && historyItemData.rating === nv) return
+
+                                        // 1) update local reactive value so UI changes immediately
+                                        value = nv
+
+                                        // 2) keep your data + backend in sync
+                                        historyItemData.rating = nv
+                                        rating.text = nv
+                                        backend.changeRating(historyItemData.index, nv)
+                                    }
+
+                                    // 3) if rating can change from outside (after save/load), resync UI:
+                                    Connections {
+                                        target: backend
+                                        onDropPointsChanged: {
+                                            // pull fresh value from your item, then reflect locally
+                                            starBar.value = historyItemData.rating
+                                        }
+                                    }
+
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: starBar.maxStars
+                                        delegate: Item {
+                                            width: 80; height: 80
+                                            property int starIndex: index + 1
+
+                                            QGCColoredImage {
+                                                anchors.fill: parent
+                                                source: starBar.starIcon
+                                                fillMode: Image.PreserveAspectFit
+                                                // Drive transparency via color alpha (reliably updates)
+                                                color: starBar.value >= starIndex ? Qt.rgba(0, 0, 0, 1) : Qt.rgba(0.7, 0.7, 0.7, 1)
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: starBar.setRating(starIndex)
+                                                hoverEnabled: true
+                                            }
+                                        }
+                                    }
+                                }
+
+                                QGCLabel {
+                                    id: rating
+                                    text: historyItemData.rating
+                                    visible: true
+                                }
+                            }
+
+                            QGCLabel {
+                                text:               historyItemData.counter
+                                visible:            true
+                            }
+
+                            QGCLabel {
+                                text: Number(historyItemData.lat).toFixed(3) + " " + Number(historyItemData.lon).toFixed(3)
+                            }
+
+                            QGCButton {
+                                text: "Remove Drop point"
+                                onClicked:{
+                                    backend.removeDropPoint(historyItemData.index)
+                                    historyItemPopUpDialog.hideDialog()
+                                }
+                            }
+                            // QGCButton {
+                            //     text: "Change rating"
+                            // }
+
+                        }
+                    }
+                }
+            }
+
+            Component {
+                id: addDropPointPopUp
+
+                QGCPopupDialog {
+                    id:      addDropPointPopUpDialog
+                    title:   qsTr("Add drop point")
+                    buttons: StandardButton.Close
+
+                    ColumnLayout {
+                        GridLayout {
+                            flow: GridLayout.TopToBottom
+                            rows: 4
+                            columnSpacing: ScreenTools.defaultFontPixelWidth
+                            rowSpacing: ScreenTools.defaultFontPixelHeight * 0.5
+
+                            QGCLabel { text: qsTr("Latitude:") }
+                            QGCTextField {
+                                id: latField
+                                text: (_newDropPointCoord && _newDropPointCoord.isValid)
+                                          ? Number(_newDropPointCoord.latitude).toFixed(8)
+                                          : ""
+                                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                onEditingFinished: {
+                                    var v = Number(text)
+                                    if (isFinite(v) && v >= -90 && v <= 90) {
+                                        _newDropPointCoord = QtPositioning.coordinate(v, _newDropPointCoord.longitude)
+                                    } else {
+                                        // revert
+                                        text = Number(_newDropPointCoord.latitude).toFixed(8)
+                                    }
+                                }
+                            }
+
+                            QGCLabel { text: qsTr("Longitude:") }
+                            QGCTextField {
+                                id: lonField
+                                text: (_newDropPointCoord && _newDropPointCoord.isValid)
+                                          ? Number(_newDropPointCoord.longitude).toFixed(8)
+                                          : ""
+                                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                onEditingFinished: {
+                                    var v = Number(text)
+                                    if (isFinite(v) && v >= -180 && v <= 180) {
+                                        _newDropPointCoord = QtPositioning.coordinate(_newDropPointCoord.latitude, v)
+                                    } else {
+                                        text = Number(_newDropPointCoord.longitude).toFixed(8)
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.topMargin: 12
+                            spacing: 10
+
+                            QGCButton {
+                                text: qsTr("Cancel")
+                                onClicked: addDropPointPopUpDialog.hideDialog()
+                            }
+
+                            QGCButton {
+                                text: qsTr("Add")
+                                enabled: _newDropPointCoord && isFinite(_newDropPointCoord.latitude) && isFinite(_newDropPointCoord.longitude)
+                                onClicked: {
+                                    backend.addDropPoint(
+                                        "Point",
+                                        Number(_newDropPointCoord.latitude),
+                                        Number(_newDropPointCoord.longitude)
+                                    )
+                                    addDropPointPopUpDialog.hideDialog()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            function _seqOfDropTargetB() {
+                // We want the mission item right before the DO_SET_SERVO item.
+                // Find first servo command, then return previous item's sequenceNumber.
+                var n = _missionController.visualItems.count
+                if (!n) return -1
+
+                for (var i = 0; i < n; i++) {
+                    var vi = _missionController.visualItems.get(i)
+                    if (!vi) continue
+
+                    // Most QGC VisualMissionItems expose command for SimpleMissionItem
+                    // Depending on your fork, it may be vi.command or vi.missionItem.command
+                    var cmd = -1
+                    try {
+                        if (vi.command !== undefined) cmd = vi.command
+                        else if (vi.missionItem && vi.missionItem.command !== undefined) cmd = vi.missionItem.command
+                    } catch (e) {}
+
+                    if (cmd === MAV_CMD_DO_SET_SERVO) {
+                        // previous visual item is the B waypoint
+                        if (i > 0) {
+                            var prev = _missionController.visualItems.get(i - 1)
+                            return prev ? prev.sequenceNumber : -1
+                        }
+                        return -1
+                    }
+                }
+                return -1
+            }
+
+
+            function _isSelectableAndDraggable(seq) {
+                var bSeq = _seqOfDropTargetB()
+                return seq === bSeq
+            }
+
+            // Add the mission item visuals to the map
+            Repeater {
+                model: _missionController.visualItems
+                delegate: MissionItemMapVisual {
+                    map:         editorMap
+                    onClicked: {
+                        if (_isSelectableAndDraggable(sequenceNumber)) {
+                            _missionController.setCurrentPlanViewSeqNum(sequenceNumber, false)
+                        }
+                    }
+                    opacity:     _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
+                    interactive: _editingLayer == _layerMission
+                    vehicle:     _planMasterController.controllerVehicle
+                }
+            }
+
+            // Add lines between waypoints
+            MissionLineView {
+                showSpecialVisual:  _missionController.isROIBeginCurrentItem
+                model:              _missionController.simpleFlightPathSegments
+                opacity:            _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
+            }
+
+            // Direction arrows in waypoint lines
+            MapItemView {
+                model: _editingLayer == _layerMission ? _missionController.directionArrows : undefined
+
+                delegate: MapLineArrow {
+                    fromCoord:      object ? object.coordinate1 : undefined
+                    toCoord:        object ? object.coordinate2 : undefined
+                    arrowPosition:  3
+                    z:              QGroundControl.zOrderWaypointLines + 1
+                }
+            }
+
+            // Incomplete segment lines
+            MapItemView {
+                model: _missionController.incompleteComplexItemLines
+
+                delegate: MapPolyline {
+                    path:       [ object.coordinate1, object.coordinate2 ]
+                    line.width: 1
+                    line.color: "red"
+                    z:          QGroundControl.zOrderWaypointLines
+                    opacity:    _editingLayer == _layerMission ? 1 : editorMap._nonInteractiveOpacity
+                }
+            }
+
+            // UI for splitting the current segment
+            MapQuickItem {
+                id:             splitSegmentItem
+                anchorPoint.x:  sourceItem.width / 2
+                anchorPoint.y:  sourceItem.height / 2
+                z:              QGroundControl.zOrderWaypointLines + 1
+                visible:         false//_editingLayer == _layerMission
+
+                sourceItem: SplitIndicator {
+                    onClicked:  _missionController.insertSimpleMissionItem(splitSegmentItem.coordinate,
+                                                                           _missionController.currentPlanViewVIIndex,
+                                                                           true /* makeCurrentItem */)
+                }
+
+                function _updateSplitCoord() {
+                    if (_missionController.splitSegment) {
+                        var distance = _missionController.splitSegment.coordinate1.distanceTo(_missionController.splitSegment.coordinate2)
+                        var azimuth = _missionController.splitSegment.coordinate1.azimuthTo(_missionController.splitSegment.coordinate2)
+                        splitSegmentItem.coordinate = _missionController.splitSegment.coordinate1.atDistanceAndAzimuth(distance / 2, azimuth)
+                    } else {
+                        coordinate = QtPositioning.coordinate()
+                    }
+                }
+
+                Connections {
+                    target:                 _missionController
+                    function onSplitSegmentChanged()  { splitSegmentItem._updateSplitCoord() }
+                }
+
+                Connections {
+                    target:                 _missionController.splitSegment
+                    function onCoordinate1Changed()   { splitSegmentItem._updateSplitCoord() }
+                    function onCoordinate2Changed()   { splitSegmentItem._updateSplitCoord() }
+                }
+            }
+
+            // Add the vehicles to the map
+            MapItemView {
+                model: QGroundControl.multiVehicleManager.vehicles
+                delegate: VehicleMapItem {
+                    vehicle:        object
+                    coordinate:     object.coordinate
+                    map:            editorMap
+                    size:           ScreenTools.defaultFontPixelHeight * 3
+                    z:              QGroundControl.zOrderMapItems - 1
+                }
+            }
+
+
 
             GeoFenceMapVisuals {
                 map:                    editorMap
@@ -1007,12 +1329,20 @@ Item {
         // Left tool strip
         ToolStrip {
             id:                 toolStrip
-            anchors.margins:    _toolsMargin
+            anchors.margins:    _toolsMargin/3
             anchors.left:       parent.left
             anchors.top:        parent.top
             z:                  QGroundControl.zOrderWidgets
-            maxHeight:          parent.height - toolStrip.y
+            maxHeight:          (parent.height - y) / scaleFactor - _toolsMargin/3
             title:              qsTr("Plan")
+
+
+            // --- added for scaling ---
+            property real scaleFactor: 1.5
+            transformOrigin: Item.TopLeft
+            scale: scaleFactor
+            // --- end added ---
+
 
             readonly property int flyButtonIndex:       0
             readonly property int fileButtonIndex:      1
@@ -1110,24 +1440,25 @@ Item {
                         dropPanelComponent: centerMapDropPanel
                     },
 
-                    ToolStripAction {
-                        id:                 history
-                        text:               qsTr("History")
-                        iconSource:         "/qmlimages/MapAddMission.svg"
-                        enabled:            true
-                        visible:            true
-                        checkable:          true
-                        onCheckedChanged: {
-                            if(checked){
-                                // _planMasterController.removeAllFromVehicle()
-                                // _missionController.setCurrentPlanViewSeqNum(0, true)
-                                // backend.dropPointSelected = false
-                                historyDropPoints.visible = true
-                            } else {
-                                historyDropPoints.visible = false
-                            }
-                        }
-                    },
+                    // ToolStripAction {
+                    //     id:                 history
+                    //     text:               qsTr("History")
+                    //     iconSource:         "/qmlimages/MapAddMission.svg"
+                    //     enabled:            true
+                    //     visible:            true
+                    //     checkable:          true
+                    //     onCheckedChanged: {
+                    //         if(checked){
+                    //             // _planMasterController.removeAllFromVehicle()
+                    //             // _missionController.setCurrentPlanViewSeqNum(0, true)
+                    //             // backend.dropPointSelected = false
+                    //             QGroundControl.settingsManager.flightMapSettings.enableHistory.value = true
+                    //         } else {
+                    //             QGroundControl.settingsManager.flightMapSettings.enableHistory.value = false
+                    //         }
+                    //     }
+
+                    // },
 
                     ToolStripAction {
                         id:                 clearToolStripAction
@@ -1311,7 +1642,7 @@ Item {
                 anchors.right:          parent.right
                 myGeoFenceController:   _geoFenceController
                 flightMap:              editorMap
-                visible:                _editingLayer == _layerGeoFence
+                visible:               _editingLayer == _layerGeoFence
             }
 
             // Rally Point Editor
@@ -1360,140 +1691,17 @@ Item {
         MapScale {
             id:                     mapScale
             anchors.margins:        _toolsMargin
-            anchors.bottom:         terrainStatus.visible ? terrainStatus.top : parent.bottom
-            anchors.left:           toolStrip.y + toolStrip.height + _toolsMargin > mapScale.y ? toolStrip.right: parent.left
+            //anchors.bottom:         terrainStatus.visible ? terrainStatus.top : parent.bottom
+            anchors.top:            parent.top
+            anchors.right:          parent.right// toolStrip.y + toolStrip.height + _toolsMargin > mapScale.y ? toolStrip.right: parent.left
             mapControl:             editorMap
-            buttonsOnLeft:          true
+            buttonsOnLeft:          false
             terrainButtonVisible:   _editingLayer === _layerMission
             terrainButtonChecked:   terrainStatus.visible
             onTerrainButtonClicked: terrainStatus.toggleVisible()
         }
     }
-    Component {
-        id: historyItemPopUp
 
-        QGCPopupDialog {
-            id:         historyItemPopUpDialog
-            title:      qsTr(historyItemData.label)
-            buttons:    StandardButton.Close
-
-            ColumnLayout {
-                //spacing: _margins
-
-                GridLayout {
-                    id:     gridLayout
-                    flow:   GridLayout.TopToBottom
-                    rows:   3
-
-                    QGCLabel {
-                        text:               qsTr("Drop Point Rating")
-                        visible:            true
-                        //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
-                    }
-
-
-                    QGCLabel {
-                        text:               "Times used"
-                        visible:            true
-                        //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
-                    }
-
-                    QGCButton {
-                        text: "Use again"
-                        enabled: globals.activeVehicle && globals.activeVehicle.coordinate.isValid
-                        onClicked:{
-                            if(globals.activeVehicle && globals.activeVehicle.coordinate.isValid){
-                                historyItemPopUpDialog.hideDialog()
-                                insertSimpleItemAfterCurrent(QtPositioning.coordinate(historyItemData.lat, historyItemData.lon))
-                            }
-                        }
-                    }
-
-
-                    RowLayout {
-                        id: ratingRow
-                        spacing: 8
-
-                        RowLayout {
-                            id: starBar
-                            property int maxStars: 5
-                            // Don't rely on a non-notifyable binding; seed once:
-                            property int value: historyItemData.rating
-                            readonly property string starIcon: "/InstrumentValueIcons/star-full.svg"
-
-                            function setRating(v) {
-                                var nv = Math.max(0, Math.min(maxStars, v))
-                                if (value === nv && historyItemData.rating === nv) return
-
-                                // 1) update local reactive value so UI changes immediately
-                                value = nv
-
-                                // 2) keep your data + backend in sync
-                                historyItemData.rating = nv
-                                rating.text = nv
-                                backend.changeRating(historyItemData.index, nv)
-                            }
-
-                            // 3) if rating can change from outside (after save/load), resync UI:
-                            Connections {
-                                target: backend
-                                onDropPointsChanged: {
-                                    // pull fresh value from your item, then reflect locally
-                                    starBar.value = historyItemData.rating
-                                }
-                            }
-
-                            spacing: 6
-
-                            Repeater {
-                                model: starBar.maxStars
-                                delegate: Item {
-                                    width: 40; height: 40
-                                    property int starIndex: index + 1
-
-                                    QGCColoredImage {
-                                        anchors.fill: parent
-                                        source: starBar.starIcon
-                                        fillMode: Image.PreserveAspectFit
-                                        // Drive transparency via color alpha (reliably updates)
-                                        color: Qt.rgba(1, 1, 1, starBar.value >= starIndex ? 1.0 : 0.6)
-                                    }
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: starBar.setRating(starIndex)
-                                        hoverEnabled: true
-                                    }
-                                }
-                            }
-                        }
-
-                        QGCLabel {
-                            id: rating
-                            text: historyItemData.rating
-                            visible: true
-                        }
-                    }
-
-                    QGCLabel {
-                        text:               historyItemData.counter
-                        visible:            true
-                    }
-
-                    QGCButton {
-                        text: "Remove Drop point"
-                        onClicked:{
-                            backend.removeDropPoint(historyItemData.index)
-                            historyItemPopUpDialog.hideDialog()
-                        }
-                    }
-                    // QGCButton {
-                    //     text: "Change rating"
-                    // }
-
-                }
-            }
-        }
-    }
 
     Component {
         id: syncLoadFromVehicleOverwrite
@@ -1565,6 +1773,8 @@ Item {
         CenterMapDropPanel {
             map:            editorMap
             fitFunctions:   mapFitFunctions
+            transformOrigin: Item.TopLeft
+            scale: 1.0 / toolStrip.scaleFactor
         }
     }
 
@@ -1595,414 +1805,351 @@ Item {
     Component {
         id: syncDropPanel
 
-        ColumnLayout {
-            id:         columnHolder
-            spacing:    _margin
+        Item {
+            id: panelRoot
 
-            property string _overwriteText: (_editingLayer == _layerMission) ? qsTr("Mission overwrite") : ((_editingLayer == _layerGeoFence) ? qsTr("GeoFence overwrite") : qsTr("Rally Points overwrite"))
+            // Reasonable width so the background matches buttons
+            width:  ScreenTools.defaultFontPixelWidth * 26
 
-            QGCLabel {
-                id:                 unsavedChangedLabel
-                //Layout.fillWidth:   true
-                wrapMode:           Text.WordWrap
-                Layout.preferredWidth: _valueFieldWidth*2
-                text:               globals.activeVehicle ?
-                                        qsTr("You have unsaved changes. You should upload to your vehicle, or save to a file.") :
-                                        qsTr("You have unsaved changes.")
-                visible:            _planMasterController.dirty
-            }
+            readonly property real _vMargin:   ScreenTools.defaultFontPixelHeight * 2
+            readonly property real _maxHeight: mainWindow
+                                               ? (mainWindow.height - _vMargin) * 0.6
+                                               : (ScreenTools.defaultFontPixelHeight * 35) * 0.6
 
+            // Limit panel height to screen and let inner content scroll
+            height: Math.min(columnHolder.implicitHeight + ScreenTools.defaultFontPixelHeight,
+                             _maxHeight) * 1.5
 
+            // Counter the 1.5x ToolStrip scale so this panel is "normal size"
+            transformOrigin: Item.TopLeft
+            scale: 1.0 / toolStrip.scaleFactor
 
-            SectionHeader {
-                id:                 storageSection
-                Layout.fillWidth:   true
-                text:               qsTr("Current Profile "/*+_planViewSettings.currentProfileName.rawValue*/)
-            }
+            // 🔧 Key fix: implicit size must match *visible* (scaled) size
+            implicitWidth:  width * scale
+            implicitHeight: height * scale
 
-            QGCTextField
-            {
-            id: editTextField
-            text: qsTr(_planViewSettings.currentProfileName.rawValue)
-            Layout.fillWidth: true
-            visible: _isEdit
-            //height: ScreenTools.defaultFontPixelWidth * 10
+            QGCFlickable {
+                id: flick
+                anchors.fill: parent
+                contentWidth:  panelRoot.width/1.5
+                contentHeight: columnHolder.implicitHeight
+                clip:          true
 
-            }
+                ColumnLayout {
+                    id:         columnHolder
+                    width:      flick.width - ScreenTools.defaultFontPixelWidth * 2
+                    anchors.margins: ScreenTools.defaultFontPixelWidth
+                    spacing:    _margin
 
-            QGCComboBox
-            {
+                    property string _overwriteText: (_editingLayer == _layerMission) ?
+                                                     qsTr("Mission overwrite") :
+                                                     ((_editingLayer == _layerGeoFence) ?
+                                                         qsTr("GeoFence overwrite") :
+                                                         qsTr("Rally Points overwrite"))
 
-                id: scale
-                Layout.fillWidth: true
-                //currentIndex: -1
-                //currentText: "Select Profile"
-                //text: _planViewSettings.currentProfileName.rawValue
-                model: backend.profileList
-                visible: !_isNew && !_isEdit
-                Component.onCompleted:
-                {
-                    currentIndex = find(_planViewSettings.currentProfileName.rawValue)
-
-                }
-                onActivated:
-                    {
-                        console.log(scale.currentText)
-                        backend.currentProfile=scale.currentText
-                    }
-            }
-
-            FactTextField
-            {
-            id: newTextField
-            Layout.fillWidth: true
-            fact: _planViewSettings.newProfileName
-            visible: _isNew
-            }
-
-
-
-
-            GridLayout {
-                columns:            2
-                rowSpacing:         _margin
-                columnSpacing:      ScreenTools.defaultFontPixelWidth
-                visible:            storageSection.visible
-
-
-                QGCLabel
-                {
-                text: qsTr("Takeoff Angle:")
-                }
-                FactTextField
-                {
-                    id:angleFactTextField
-                    fact: _planViewSettings.currentProfileAngle
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-
-                FactTextField
-                {
-                    id:newAngleFactTextField
-                    fact: _planViewSettings.newProfileAngle
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                }
-
-                QGCLabel
-                {
-                text: qsTr("Takeoff speed:")
-                }
-                FactTextField
-                {
-                    id:winchFactTextField
-                    fact: _planViewSettings.currentProfileTakeOffSpeed
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-                FactTextField
-                {
-                    id:newWinchFactTextField
-                    fact: _planViewSettings.newProfileTakeOffSpeed
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                }
-
-                QGCLabel
-                {
-                text: qsTr("Backbone:")
-                }
-                FactTextField
-                {
-                    id:cableLengthFactTextField
-                    fact: _planViewSettings.currentProfileCableLength
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-                FactTextField
-                {
-                    id:newCableLengthFactTextField
-                    fact: _planViewSettings.currentProfileCableLength
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                    //enabled: _isEdit
-                }
-
-
-                QGCLabel
-                {
-                text: qsTr("Haul Altitude:")
-                }
-                FactTextField
-                {
-                    id:altitudeFactTextField
-                    fact: _planViewSettings.currentProfileAlt
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-                FactTextField
-                {
-                    id:newAltitudeFactTextField
-                    fact: _planViewSettings.newProfileAlt
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                }
-
-                QGCLabel
-                {
-                text: qsTr("Haul Speed:")
-                }
-                FactTextField
-                {
-                    id:speedFactTextField
-                    fact: _planViewSettings.currentProfileSpeed
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: !_isNew
-                    enabled: _isEdit
-                }
-
-                FactTextField
-                {
-                    id:newSpeedFactTextField
-                    fact: _planViewSettings.newProfileSpeed
-                    Layout.preferredWidth:  _valueFieldWidth
-                    //readOnly: true
-                    visible: _isNew
-                }
-
-
-
-
-
-                // QGCButton {
-                //     text:               qsTr("Open...")
-                //     Layout.fillWidth:   true
-                //     enabled:            !_planMasterController.syncInProgress
-                //     onClicked: {
-                //         dropPanel.hide()
-                //         if (_planMasterController.dirty) {
-                //             mainWindow.showComponentDialog(syncLoadFromFileOverwrite, columnHolder._overwriteText, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                //         } else {
-                //             _planMasterController.loadFromSelectedFile()
-                //         }
-                //     }
-                // }
-
-                // QGCButton {
-                //     text:               qsTr("Save")
-                //     Layout.fillWidth:   true
-                //     enabled:            !_planMasterController.syncInProgress && _planMasterController.currentPlanFile !== ""
-                //     onClicked: {
-                //         dropPanel.hide()
-                //         if(_planMasterController.currentPlanFile !== "") {
-                //             _planMasterController.saveToCurrent()
-                //         } else {
-                //             _planMasterController.saveToSelectedFile()
-                //         }
-                //     }
-                // }
-
-                // QGCButton {
-                //     text:               qsTr("Save As...")
-                //     Layout.fillWidth:   true
-                //     enabled:            !_planMasterController.syncInProgress && _planMasterController.containsItems
-                //     onClicked: {
-                //         dropPanel.hide()
-                //         _planMasterController.saveToSelectedFile()
-                //     }
-                // }
-
-
-            }
-
-
-
-
-
-            GridLayout {
-                columns:            1
-                columnSpacing:      _margin
-                rowSpacing:         _margin
-                Layout.fillWidth:   true
-                visible:            true//createSection.visible
-
-                QGCButton
-                {
-                    text: qsTr("SAVE values")
-                    visible: _isEdit
-                    Layout.fillWidth:   true
-                    onClicked:
-                    {
-                        //backend.saveJson
-                        backend.editProfile = editTextField.text
-                        var copy = backend.profileList
-                        scale.model = copy
-                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
-                        _isEdit = false
-                    }
-                }
-
-                QGCButton
-                {
-                    text: qsTr("ADD profile")
-                    visible: _isNew
-                    Layout.fillWidth:   true
-                    onClicked:
-                    {
-                        backend.newProfile = newTextField.text
-                        var copy = backend.profileList
-                        scale.model = copy
-                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
-                        _isNew = false
-                    }
-                }
-
-                QGCButton {
-                    id: testBut
-                    text:               qsTr("New Profile")
-                    Layout.fillWidth:   true 
-                    visible:            !_isNew && !_isEdit && !_isDel
-                    onClicked: {
-                        _isNew = true
-                        //testBut.text=scale.currentText
-                        //console.log(backend.profile[0])
-                        //dropPanel.hide()
-                        //angleFactTextField.visible=false
-                        //angleQGCTextField.visible=true
-                        //_isNew = !_isNew
-                        //
-                    }
-                }
-                QGCButton {
-                    text:               qsTr("Edit Current Profile")
-                    Layout.fillWidth:   true
-                    visible:            !_isNew && !_isEdit && !_isDel
-                    onClicked: {
-                        //scale.visible = false;
-                        _isEdit = true
-                        //dropPanel.hide()
-
-                    }
-                }
-                QGCButton {
-                    text:               qsTr("Delete profile")
-                    Layout.fillWidth:   true
-                    visible:            !_isNew && !_isEdit && !_isDel
-                    onClicked:
-                    {
-                        _isDel = true
-
-                    }
-                }
-                QGCLabel
-                {
-                text: qsTr("Do you want to remove current profile?")
-                Layout.preferredWidth: _valueFieldWidth*2
-                visible: _isDel
-                wrapMode: Label.WordWrap
-                }
-                QGCButton
-                {
-                    text: qsTr("YES")
-                    visible: _isDel
-                    onClicked:
-                    {
-                        backend.deleteProfile = _planViewSettings.currentProfileName.rawValue
-                        var copy = backend.profileList
-                        scale.model = copy
-                        scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
-                        _isDel = false
+                    QGCLabel {
+                        id:                 unsavedChangedLabel
+                        wrapMode:           Text.WordWrap
+                        Layout.preferredWidth: _valueFieldWidth*2
+                        text:               globals.activeVehicle ?
+                                                qsTr("You have unsaved changes. You should upload to your vehicle, or save to a file.") :
+                                                qsTr("You have unsaved changes.")
+                        visible:            _planMasterController.dirty
                     }
 
-                }
-                QGCButton
-                {
-                    text: qsTr("NO")
-                    visible: _isDel
-                    onClicked:
-                    {
-                    _isDel = false
+                    SectionHeader {
+                        id:                 storageSection
+                        Layout.fillWidth:   true
+                        text:               qsTr("Current Profile ")
                     }
-                }
 
-            }
-
-
-
-            GridLayout {
-                columns:            2
-                rowSpacing:         _margin
-                columnSpacing:      ScreenTools.defaultFontPixelWidth
-                visible:            storageSection.visible
-            }
-
-            SectionHeader {
-                id:                 vehicleSection
-                Layout.fillWidth:   true
-                text:               qsTr("Mission")
-            }
-
-            GridLayout {
-                Layout.fillWidth:   true
-                rowSpacing:         _margin
-                columns:            2
-                visible:            vehicleSection.visible
-
-                QGCButton {
-                    text:               qsTr("Upload")
-                    Layout.fillWidth:   true
-                    enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress && _planMasterController.containsItems
-                    visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                    onClicked: {
-                        dropPanel.hide()
-                        _planMasterController.upload()
+                    QGCTextField {
+                        id: editTextField
+                        text: qsTr(_planViewSettings.currentProfileName.rawValue)
+                        Layout.fillWidth: true
+                        visible: _isEdit
                     }
-                }
 
-                QGCButton {
-                    text:               qsTr("Download")
-                    Layout.fillWidth:   true
-                    enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
-                    visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                    onClicked: {
-                        dropPanel.hide()
-                        if (_planMasterController.dirty) {
-                            mainWindow.showComponentDialog(syncLoadFromVehicleOverwrite, columnHolder._overwriteText, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                        } else {
-                            _planMasterController.loadFromVehicle()
+                    QGCComboBox {
+                        id: scale
+                        Layout.fillWidth: true
+                        model: backend.profileList
+                        visible: !_isNew && !_isEdit
+                        Component.onCompleted: {
+                            currentIndex = find(_planViewSettings.currentProfileName.rawValue)
+                        }
+                        onActivated: {
+                            console.log(scale.currentText)
+                            backend.currentProfile = scale.currentText
                         }
                     }
-                }
 
-                QGCButton {
-                    text:               qsTr("Clear")
-                    Layout.fillWidth:   true
-                    Layout.columnSpan:  2
-                    enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
-                    visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                    onClicked: {
-                        dropPanel.hide()
-                        mainWindow.showComponentDialog(clearVehicleMissionDialog, text, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                        //QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(false)
-                        //dropPointSelected = false
-                        backend.dropPointSelected = false
+                    FactTextField {
+                        id: newTextField
+                        Layout.fillWidth: true
+                        fact: _planViewSettings.newProfileName
+                        visible: _isNew
                     }
-                }
-            }
-        }
+
+                    GridLayout {
+                        columns:            2
+                        rowSpacing:         _margin
+                        columnSpacing:      ScreenTools.defaultFontPixelWidth
+                        visible:            storageSection.visible
+
+                        QGCLabel { text: qsTr("Takeoff Angle:") }
+                        FactTextField {
+                            id: angleFactTextField
+                            fact: _planViewSettings.currentProfileAngle
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: !_isNew
+                            enabled: _isEdit
+                        }
+
+                        FactTextField {
+                            id: newAngleFactTextField
+                            fact: _planViewSettings.newProfileAngle
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Takeoff speed:") }
+                        FactTextField {
+                            id: winchFactTextField
+                            fact: _planViewSettings.currentProfileTakeOffSpeed
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: !_isNew
+                            enabled: _isEdit
+                        }
+                        FactTextField {
+                            id: newWinchFactTextField
+                            fact: _planViewSettings.newProfileTakeOffSpeed
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Backbone:") }
+                        FactTextField {
+                            id: cableLengthFactTextField
+                            fact: _planViewSettings.currentProfileCableLength
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: !_isNew
+                            enabled: _isEdit
+                        }
+                        FactTextField {
+                            id: newCableLengthFactTextField
+                            fact: _planViewSettings.currentProfileCableLength
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Haul Altitude:") }
+                        FactTextField {
+                            id: altitudeFactTextField
+                            fact: _planViewSettings.currentProfileAlt
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: !_isNew
+                            enabled: _isEdit
+                        }
+                        FactTextField {
+                            id: newAltitudeFactTextField
+                            fact: _planViewSettings.newProfileAlt
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Haul Speed:") }
+                        FactTextField {
+                            id: speedFactTextField
+                            fact: _planViewSettings.currentProfileSpeed
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: !_isNew
+                            enabled: _isEdit
+                        }
+                        FactTextField {
+                            id: newSpeedFactTextField
+                            fact: _planViewSettings.newProfileSpeed
+                            Layout.preferredWidth:  _valueFieldWidth
+                            visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Drop Descent:") }
+
+                        FactCheckBox {
+                            id: useDropAltCheck
+                            fact: _isNew ? _planViewSettings.newProfileUseDropAlt
+                                         : _planViewSettings.currentProfileUseDropAlt
+                            enabled: _isNew || _isEdit
+                        }
+
+                        QGCLabel { text: qsTr("Drop Altitude:")}
+
+                        FactTextField {
+                            fact: _isNew ? _planViewSettings.newProfileDropAlt
+                                         : _planViewSettings.currentProfileDropAlt
+                            Layout.preferredWidth: _valueFieldWidth
+                            enabled: (_isNew || _isEdit) && useDropAltCheck.checked
+                            opacity: useDropAltCheck.checked ? 1.0 : 0.4
+                        }
+
+                    }
+
+                    // --- Profile management buttons ---
+                    GridLayout {
+                        columns:            1
+                        columnSpacing:      _margin
+                        rowSpacing:         _margin
+                        Layout.fillWidth:   true
+                        visible:            true
+
+                        QGCButton {
+                            text: qsTr("SAVE values")
+                            visible: _isEdit
+                            Layout.fillWidth:   true
+                            onClicked: {
+                                backend.editProfile = editTextField.text
+                                var copy = backend.profileList
+                                scale.model = copy
+                                scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                                _isEdit = false
+                            }
+                        }
+
+                        QGCButton {
+                            text: qsTr("ADD profile")
+                            visible: _isNew
+                            Layout.fillWidth:   true
+                            onClicked: {
+                                backend.newProfile = newTextField.text
+                                var copy = backend.profileList
+                                scale.model = copy
+                                scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                                _isNew = false
+                            }
+                        }
+
+                        QGCButton {
+                            id: testBut
+                            text:               qsTr("New Profile")
+                            Layout.fillWidth:   true
+                            visible:            !_isNew && !_isEdit && !_isDel
+                            onClicked:          _isNew = true
+                        }
+
+                        QGCButton {
+                            text:               qsTr("Edit Current Profile")
+                            Layout.fillWidth:   true
+                            visible:            !_isNew && !_isEdit && !_isDel
+                            onClicked:          _isEdit = true
+                        }
+
+                        QGCButton {
+                            text:               qsTr("Delete profile")
+                            Layout.fillWidth:   true
+                            visible:            !_isNew && !_isEdit && !_isDel
+                            onClicked:          _isDel = true
+                        }
+
+                        QGCLabel {
+                            text: qsTr("Do you want to remove current profile?")
+                            Layout.preferredWidth: _valueFieldWidth*2
+                            visible: _isDel
+                            wrapMode: Label.WordWrap
+                        }
+
+                        QGCButton {
+                            text: qsTr("YES")
+                            visible: _isDel
+                            onClicked: {
+                                backend.deleteProfile = _planViewSettings.currentProfileName.rawValue
+                                var copy = backend.profileList
+                                scale.model = copy
+                                scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
+                                _isDel = false
+                            }
+                        }
+
+                        QGCButton {
+                            text: qsTr("NO")
+                            visible: _isDel
+                            onClicked: _isDel = false
+                        }
+                    }
+
+                    // spacer grid kept for layout compatibility
+                    GridLayout {
+                        columns:            2
+                        rowSpacing:         _margin
+                        columnSpacing:      ScreenTools.defaultFontPixelWidth
+                        visible:            storageSection.visible
+                    }
+
+                    SectionHeader {
+                        id:                 vehicleSection
+                        Layout.fillWidth:   true
+                        text:               qsTr("Mission")
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth:   true
+                        rowSpacing:         _margin
+                        columns:            2
+                        visible:            vehicleSection.visible
+
+                        QGCButton {
+                            text:               qsTr("Upload")
+                            Layout.fillWidth:   true
+                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress && _planMasterController.containsItems
+                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
+                            onClicked: {
+                                dropPanel.hide()
+                                _planMasterController.upload()
+                            }
+                        }
+
+                        QGCButton {
+                            text:               qsTr("Download")
+                            Layout.fillWidth:   true
+                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
+                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
+                            onClicked: {
+                                dropPanel.hide()
+                                if (_planMasterController.dirty) {
+                                    mainWindow.showComponentDialog(
+                                        syncLoadFromVehicleOverwrite,
+                                        columnHolder._overwriteText,
+                                        mainWindow.showDialogDefaultWidth,
+                                        StandardButton.Yes | StandardButton.Cancel
+                                    )
+                                } else {
+                                    _planMasterController.loadFromVehicle()
+                                }
+                            }
+                        }
+
+                        QGCButton {
+                            text:               qsTr("Clear")
+                            Layout.fillWidth:   true
+                            Layout.columnSpan:  2
+                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
+                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
+                            onClicked: {
+                                dropPanel.hide()
+                                mainWindow.showComponentDialog(
+                                    clearVehicleMissionDialog,
+                                    text,
+                                    mainWindow.showDialogDefaultWidth,
+                                    StandardButton.Yes | StandardButton.Cancel
+                                )
+                                backend.dropPointSelected = false
+                            }
+                        }
+                    }
+                } // ColumnLayout
+            } // QGCFlickable
+        } // Item
     }
+
+
+
 }

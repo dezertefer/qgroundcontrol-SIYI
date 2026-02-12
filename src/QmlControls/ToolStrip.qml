@@ -100,7 +100,7 @@ Rectangle {
                     anchors.right:      toolStripColumn.right
                     height:             width
                     radius:             ScreenTools.defaultFontPixelWidth / 2
-                    fontPointSize:      ScreenTools.smallFontPointSize
+                    fontPointSize:      ScreenTools.smallFontPointSize * 0.8
                     toolStripAction:    modelData
                     dropPanel:          _dropPanel
                     onDropped:          _root.dropped(index)

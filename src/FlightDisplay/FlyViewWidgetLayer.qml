@@ -235,17 +235,25 @@ Item {
 
     FlyViewToolStrip {
         id:                     toolStrip
-        anchors.leftMargin:     _toolsMargin + parentToolInsets.leftEdgeCenterInset
-        anchors.topMargin:      _toolsMargin + parentToolInsets.topEdgeLeftInset
+        anchors.leftMargin:     _toolsMargin/3 + parentToolInsets.leftEdgeCenterInset
+        anchors.topMargin:      _toolsMargin/3 + parentToolInsets.topEdgeLeftInset
         anchors.left:           parent.left
         anchors.top:            parent.top
         z:                      QGroundControl.zOrderWidgets
-        maxHeight:              parent.height - y - parentToolInsets.bottomEdgeLeftInset - _toolsMargin
+        maxHeight:              (parent.height - y - parentToolInsets.bottomEdgeLeftInset) - _toolsMargin*2
         visible:                !QGroundControl.videoManager.fullScreen
+
+        // === added ===
+        property real scaleFactor: 1.5
+        transformOrigin: Item.TopLeft
+        scale: scaleFactor
+        // This is used by QGCToolInsets, so account for visual scale
+        property real leftInset: x + width * scaleFactor
+        // === end added ===
 
         onDisplayPreFlightChecklist: mainWindow.showPopupDialogFromComponent(preFlightChecklistPopup)
 
-        property real leftInset: x + width
+        //property real leftInset: x + width
     }
 
     FlyViewAirspaceIndicator {
@@ -264,8 +272,9 @@ Item {
     MapScale {
         id:                 mapScale
         anchors.margins:    _toolsMargin
-        anchors.left:       toolStrip.right
+        // anchors.left:       toolStrip.right
         anchors.top:        parent.top
+        anchors.right:      parent.right
         mapControl:         _mapControl
         buttonsOnLeft:      false
         visible:            !ScreenTools.isTinyScreen && QGroundControl.corePlugin.options.flyView.showMapScale && mapControl.pipState.state === mapControl.pipState.fullState
