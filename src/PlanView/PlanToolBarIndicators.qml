@@ -11,7 +11,7 @@ import QGroundControl.Palette           1.0
 
 // Toolbar for Plan View
 Item {
-    width: missionStats.width + _margins
+    width: parent ? parent.width : (missionStats.width + _margins)
 
     property var    _planMasterController:      globals.planMasterControllerPlanView
     property var    _currentMissionItem:        globals.currentPlanMissionItem          ///< Mission item to display status for
@@ -25,7 +25,6 @@ Item {
     property bool   _controllerValid:           _planMasterController !== undefined && _planMasterController !== null
     property bool   _controllerOffline:         _controllerValid ? _planMasterController.offline : true
     property var    _controllerDirty:           _controllerValid ? _planMasterController.dirty : false
-    property var    _controllerSyncInProgress:  _controllerValid ? _planMasterController.syncInProgress : false
 
     property bool   _currentMissionItemValid:   _currentMissionItem && _currentMissionItem !== undefined && _currentMissionItem !== null
     property bool   _curreItemIsFlyThrough:     _currentMissionItemValid && _currentMissionItem.specifiesCoordinate && !_currentMissionItem.isStandaloneCoordinate
@@ -48,8 +47,7 @@ Item {
     property int    _batteryChangePoint:        _controllerValid ? _planMasterController.missionController.batteryChangePoint : -1
     property int    _batteriesRequired:         _controllerValid ? _planMasterController.missionController.batteriesRequired : -1
     property bool   _batteryInfoAvailable:      _batteryChangePoint >= 0 || _batteriesRequired >= 0
-    property real   _controllerProgressPct:     _controllerValid ? _planMasterController.missionController.progressPct : 0
-    property bool   _syncInProgress:            _controllerValid ? _planMasterController.missionController.syncInProgress : false
+    property bool   _controllerSyncInProgress: _controllerValid ? _planMasterController.missionController.syncInProgress : false
     property real   _gradient:                  _currentMissionItemValid && _currentMissionItem.distance > 0 ?
                                                     (_currentItemIsVTOLTakeoff ?
                                                          0 :
@@ -60,13 +58,17 @@ Item {
     property string _altDifferenceText:         isNaN(_altDifference) ?         "-.-" : QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_altDifference).toFixed(1) + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
     property string _gradientText:              isNaN(_gradient) ?              "-.-" : _gradient.toFixed(0) + qsTr(" deg")
     property string _azimuthText:               isNaN(_azimuth) ?               "-.-" : Math.round(_azimuth) % 360
-    property string _headingText:               isNaN(_azimuth) ?               "-.-" : Math.round(_heading) % 360
+    property string _headingText:               isNaN(_heading) ?               "-.-" : Math.round(_heading) % 360
     property string _missionDistanceText:       isNaN(_missionDistance) ?       "-.-" : QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_missionDistance).toFixed(0) + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
     property string _missionMaxTelemetryText:   isNaN(_missionMaxTelemetry) ?   "-.-" : QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_missionMaxTelemetry).toFixed(0) + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
     property string _batteryChangePointText:    _batteryChangePoint < 0 ?       qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText:     _batteriesRequired < 0 ?        qsTr("N/A") : _batteriesRequired
 
     property real   _KEK :                      QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_missionMaxTelemetry).toFixed(2)
+
+    property bool   _uploadSucceeded:        _controllerValid ? _planMasterController.missionController.uploadSucceeded : false
+    property bool   _uploadFailed:           _controllerValid ? _planMasterController.missionController.uploadFailed : false
+    property string _uploadErrorString:      _controllerValid ? _planMasterController.missionController.uploadErrorString : ""
 
 
     readonly property real _margins: ScreenTools.defaultFontPixelWidth
@@ -88,29 +90,62 @@ Item {
         return complete
     }
 
-    // Progress bar
     Connections {
         target: _controllerValid ? _planMasterController.missionController : null
+
         onProgressPctChanged: {
-            if (_controllerProgressPct === 1) {
+            progressBar.visible = _controllerProgressPct > 0 && _controllerSyncInProgress
+        }
 
-                    missionStats.visible = false
-                    uploadCompleteText.visible = true
-                    progressBar.visible = false
-                    resetProgressTimer.start()
+        onSyncInProgressChanged: {
+            if (_controllerSyncInProgress) {
+                missionStats.visible = true
+                uploadCompleteText.visible = false
+                uploadErrorText.visible = false
+                progressBar.visible = _controllerProgressPct > 0
+            } else {
+                progressBar.visible = false
+            }
+        }
 
-            } else if (_controllerProgressPct > 0) {
-                progressBar.visible = true
+        onUploadSucceededChanged: {
+            if (_uploadSucceeded) {
+                missionStats.visible = false
+                uploadErrorText.visible = false
+                uploadCompleteText.visible = true
+                progressBar.visible = false
+                resetProgressTimer.restart()
+            }
+        }
+
+        onUploadFailedChanged: {
+            if (_uploadFailed) {
+                missionStats.visible = false
+                uploadCompleteText.visible = false
+                uploadErrorText.visible = true
+                progressBar.visible = false
+                resetErrorTimer.restart()
             }
         }
     }
 
     Timer {
-        id:             resetProgressTimer
-        interval:       2000
+        id:       resetProgressTimer
+        interval: 3000
+        repeat:   false
         onTriggered: {
             missionStats.visible = true
             uploadCompleteText.visible = false
+        }
+    }
+
+    Timer {
+        id:       resetErrorTimer
+        interval: 4000
+        repeat:   false
+        onTriggered: {
+            missionStats.visible = true
+            uploadErrorText.visible = false
         }
     }
 
@@ -120,7 +155,18 @@ Item {
         font.pointSize:         ScreenTools.largeFontPointSize
         horizontalAlignment:    Text.AlignHCenter
         verticalAlignment:      Text.AlignVCenter
-        text:                   qsTr("Processing...")
+        text:                   qsTr("Upload complete")
+        visible:                false
+    }
+
+    QGCLabel {
+        id:                     uploadErrorText
+        anchors.fill:           parent
+        font.pointSize:         ScreenTools.largeFontPointSize
+        horizontalAlignment:    Text.AlignHCenter
+        verticalAlignment:      Text.AlignVCenter
+        color:                  "red"
+        text:                   _uploadErrorString !== "" ? _uploadErrorString : qsTr("Upload failed")
         visible:                false
     }
 
@@ -268,32 +314,27 @@ Item {
         }
 
         QGCButton {
-
             id:          uploadButton
-            text:        _controllerDirty ? qsTr("Upload Required") : qsTr("Upload")
-            enabled:     _KEK<2000 && !_controllerSyncInProgress
-            visible:     !_controllerOffline && !_controllerSyncInProgress && !uploadCompleteText.visible
-            primary:     _controllerDirty
+            text:        _uploadFailed
+                            ? qsTr("Upload Failed - Retry")
+                            : (_controllerDirty ? qsTr("Upload Required") : qsTr("Upload"))
+            enabled:     _KEK < 2000 && !_controllerSyncInProgress
+            visible:     !_controllerOffline
+                         && !_controllerSyncInProgress
+                         && !uploadCompleteText.visible
+                         && (_controllerDirty || _uploadFailed)
+            primary:     _controllerDirty || _uploadFailed
 
-
-            onClicked:
-            {
-//                if(_KEK>1500.0)
-//                {
-//                    console.log("KEKEKEKEKEKE")
-//                }
-
+            onClicked: {
                 _planMasterController.upload()
-                //console.log(_uploadAllowed)
             }
 
             PropertyAnimation on opacity {
-                //onStarted: 123
                 easing.type:    Easing.OutQuart
                 from:           0.5
                 to:             1
                 loops:          Animation.Infinite
-                running:        _controllerDirty && !_controllerSyncInProgress
+                running:        (_controllerDirty || _uploadFailed) && !_controllerSyncInProgress
                 alwaysRunToEnd: true
                 duration:       2000
             }
@@ -323,22 +364,74 @@ Item {
         }
     }
 
-    // Large mission download progress bar
+    // // Large mission download progress bar
+    // Rectangle {
+    //     id:             largeProgressBar
+    //     anchors.bottom: parent.bottom
+    //     anchors.left:   parent.left
+    //     anchors.right:  parent.right
+    //     height:         parent.height
+    //     color:          qgcPal.window
+    //     visible:        _showLargeProgress
+
+    //     property bool _userHide:                false
+    //     property bool _showLargeProgress: _controllerSyncInProgress && !_userHide && qgcPal.globalTheme === QGCPalette.Light
+
+    //     Connections {
+    //         target:                 QGroundControl.multiVehicleManager
+    //         onActiveVehicleChanged: largeProgressBar._userHide = false
+    //     }
+
+    //     Rectangle {
+    //         anchors.top:    parent.top
+    //         anchors.bottom: parent.bottom
+    //         width:          _controllerProgressPct * parent.width
+    //         color:          qgcPal.colorGreen
+    //     }
+
+    //     QGCLabel {
+    //         anchors.centerIn:   parent
+    //         text:               qsTr("Mission Sync")
+    //         font.pointSize:     ScreenTools.largeFontPointSize
+    //     }
+
+    //     // QGCLabel {
+    //     //     anchors.margins:    _margin
+    //     //     anchors.right:      parent.right
+    //     //     anchors.bottom:     parent.bottom
+    //     //     text:               qsTr("Click anywhere to hide")
+
+    //     //     property real _margin: ScreenTools.defaultFontPixelWidth / 2
+    //     // }
+
+    //     MouseArea {
+    //         anchors.fill:   parent
+    //         onClicked:      largeProgressBar._userHide = true
+    //     }
+    // }
+
     Rectangle {
         id:             largeProgressBar
-        anchors.bottom: parent.bottom
-        anchors.left:   parent.left
-        anchors.right:  parent.right
-        height:         parent.height
+        anchors.fill:   parent
+        z:              9999
         color:          qgcPal.window
         visible:        _showLargeProgress
 
-        property bool _userHide:                false
-        property bool _showLargeProgress:       progressBar.visible && !_userHide && qgcPal.globalTheme === QGCPalette.Light
+        property bool _userHide: false
+        property bool _showLargeProgress: _controllerSyncInProgress && !_userHide && qgcPal.globalTheme === QGCPalette.Light
 
         Connections {
-            target:                 QGroundControl.multiVehicleManager
+            target: QGroundControl.multiVehicleManager
             onActiveVehicleChanged: largeProgressBar._userHide = false
+        }
+
+        Connections {
+            target: _controllerValid ? _planMasterController.missionController : null
+            onSyncInProgressChanged: {
+                if (_controllerSyncInProgress) {
+                    largeProgressBar._userHide = false
+                }
+            }
         }
 
         Rectangle {
@@ -354,18 +447,9 @@ Item {
             font.pointSize:     ScreenTools.largeFontPointSize
         }
 
-        // QGCLabel {
-        //     anchors.margins:    _margin
-        //     anchors.right:      parent.right
-        //     anchors.bottom:     parent.bottom
-        //     text:               qsTr("Click anywhere to hide")
-
-        //     property real _margin: ScreenTools.defaultFontPixelWidth / 2
-        // }
-
         MouseArea {
-            anchors.fill:   parent
-            onClicked:      largeProgressBar._userHide = true
+            anchors.fill: parent
+            onClicked:    largeProgressBar._userHide = true
         }
     }
 }

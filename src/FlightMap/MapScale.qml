@@ -201,7 +201,7 @@ Item {
         width:              height
         height:             ScreenTools.defaultFontPixelHeight*3
         opacity:            0.75
-        visible:            true
+        visible:            false
         mapScaleButton:     true
         onClicked:
         {
@@ -239,7 +239,7 @@ Item {
         width:              height
         height:             ScreenTools.defaultFontPixelHeight*3
         opacity:            0.75
-        visible:            true
+        visible:            false
         mapScaleButton:     true
         historyButton:      true
         //color:              QGroundControl.settingsManager.flightMapSettings.enableHistory.value ? qgcPal.buttonHighlight : qgcPal.button

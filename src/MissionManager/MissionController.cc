@@ -228,20 +228,27 @@ void MissionController::loadFromVehicle(void)
 void MissionController::sendToVehicle(void)
 {
     if (_masterController->offline()) {
-        qCWarning(MissionControllerLog) << "MissionControllerLog::sendToVehicle called while offline";
-    } else if (syncInProgress()) {
-        qCWarning(MissionControllerLog) << "MissionControllerLog::sendToVehicle called while syncInProgress";
-    } else {
-        qCDebug(MissionControllerLog) << "MissionControllerLog::sendToVehicle";
-        if (_visualItems->count() == 1) {
-            // This prevents us from sending a possibly bogus home position to the vehicle
-            QmlObjectListModel emptyModel;
-            sendItemsToVehicle(_managerVehicle, &emptyModel);
-        } else {
-            sendItemsToVehicle(_managerVehicle, _visualItems);
-        }
-        setDirty(false);
+        qCCritical(MissionControllerLog) << "MissionControllerLog::sendToVehicle called while offline";
+        return;
     }
+
+    if (syncInProgress()) {
+        qCCritical(MissionControllerLog) << "MissionControllerLog::sendToVehicle called while syncInProgress";
+        return;
+    }
+
+    _resetUploadState();
+
+    qCDebug(MissionControllerLog) << "MissionControllerLog::sendToVehicle";
+
+    if (_visualItems->count() == 1) {
+        QmlObjectListModel emptyModel;
+        sendItemsToVehicle(_managerVehicle, &emptyModel);
+    } else {
+        sendItemsToVehicle(_managerVehicle, _visualItems);
+    }
+
+    setDirty(false);
 }
 
 /// Converts from visual items to MissionItems
@@ -2386,8 +2393,17 @@ bool MissionController::showPlanFromManagerVehicle (void)
 
 void MissionController::_managerSendComplete(bool error)
 {
+    if (error) {
+        _setUploadFailed(true, tr("Mission upload failed"));
+        setDirty(true);
+        qWarning() << "Mission upload failed";
+        return;
+    }
+
+    _setUploadSucceeded(true);
+
     // Fly view always reloads on send complete
-    if (!error && _flyView) {
+    if (_flyView) {
         showPlanFromManagerVehicle();
     }
 }
@@ -2766,4 +2782,46 @@ void MissionController::setHasPosition(bool newHasPosition)
         return;
     m_hasPosition = newHasPosition;
     emit hasPositionChanged();
+}
+
+void MissionController::_resetUploadState()
+{
+    _setUploadSucceeded(false);
+    _setUploadFailed(false, QString());
+}
+
+void MissionController::_setUploadSucceeded(bool succeeded)
+{
+    if (_uploadSucceeded != succeeded) {
+        _uploadSucceeded = succeeded;
+        emit uploadSucceededChanged(_uploadSucceeded);
+    }
+
+    if (succeeded && _uploadFailed) {
+        _uploadFailed = false;
+        emit uploadFailedChanged(_uploadFailed);
+    }
+
+    if (succeeded && !_uploadErrorString.isEmpty()) {
+        _uploadErrorString.clear();
+        emit uploadErrorStringChanged(_uploadErrorString);
+    }
+}
+
+void MissionController::_setUploadFailed(bool failed, const QString& errorString)
+{
+    if (_uploadFailed != failed) {
+        _uploadFailed = failed;
+        emit uploadFailedChanged(_uploadFailed);
+    }
+
+    if (_uploadErrorString != errorString) {
+        _uploadErrorString = errorString;
+        emit uploadErrorStringChanged(_uploadErrorString);
+    }
+
+    if (failed && _uploadSucceeded) {
+        _uploadSucceeded = false;
+        emit uploadSucceededChanged(_uploadSucceeded);
+    }
 }

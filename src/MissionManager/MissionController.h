@@ -109,6 +109,10 @@ public:
     Q_PROPERTY(bool                 hasPosition                     READ hasPosition                    WRITE setHasPosition NOTIFY hasPositionChanged)
     Q_PROPERTY(double               minAMSLAltitude                 MEMBER _minAMSLAltitude             NOTIFY minAMSLAltitudeChanged)          ///< Minimum altitude associated with this mission. Used to calculate percentages for terrain status.
     Q_PROPERTY(double               maxAMSLAltitude                 MEMBER _maxAMSLAltitude             NOTIFY maxAMSLAltitudeChanged)          ///< Maximum altitude associated with this mission. Used to calculate percentages for terrain status.
+    Q_PROPERTY(bool                 uploadSucceeded                 READ uploadSucceeded                NOTIFY uploadSucceededChanged)
+    Q_PROPERTY(bool                 uploadFailed                    READ uploadFailed                   NOTIFY uploadFailedChanged)
+    Q_PROPERTY(QString              uploadErrorString               READ uploadErrorString              NOTIFY uploadErrorStringChanged)
+
 
     Q_PROPERTY(QGroundControlQmlGlobal::AltMode globalAltitudeMode         READ globalAltitudeMode         WRITE setGlobalAltitudeMode NOTIFY globalAltitudeModeChanged)
     Q_PROPERTY(QGroundControlQmlGlobal::AltMode globalAltitudeModeDefault  READ globalAltitudeModeDefault  NOTIFY globalAltitudeModeChanged)                               ///< Default to use for newly created items
@@ -222,6 +226,10 @@ public:
     bool containsItems              (void) const final;
     bool showPlanFromManagerVehicle (void) final;
 
+    bool uploadSucceeded() const { return _uploadSucceeded; }
+    bool uploadFailed() const { return _uploadFailed; }
+    QString uploadErrorString() const { return _uploadErrorString; }
+
     // Create KML file
     void addMissionToKML(KMLPlanDomDocument& planKML);
 
@@ -312,6 +320,10 @@ signals:
     void _recalcFlightPathSegmentsSignal    (void);
     void globalAltitudeModeChanged          (void);
 
+    void uploadSucceededChanged(bool uploadSucceeded);
+    void uploadFailedChanged(bool uploadFailed);
+    void uploadErrorStringChanged(const QString& uploadErrorString);
+
     void hasPositionChanged();
 
 private slots:
@@ -375,6 +387,10 @@ private:
     static double           _normalizeLon                       (double lon);
     static bool             _convertToMissionItems              (QmlObjectListModel* visualMissionItems, QList<MissionItem*>& rgMissionItems, QObject* missionItemParent);
 
+    void _setUploadSucceeded(bool succeeded);
+    void _setUploadFailed(bool failed, const QString& errorString = QString());
+    void _resetUploadState();
+
 private:
     Vehicle*                    _controllerVehicle =            nullptr;
     Vehicle*                    _managerVehicle =               nullptr;
@@ -413,6 +429,10 @@ private:
     double                      _minAMSLAltitude =              0;
     double                      _maxAMSLAltitude =              0;
     bool                        _missionContainsVTOLTakeoff =   false;
+
+    bool                        _uploadSucceeded = false;
+    bool                        _uploadFailed = false;
+    QString                     _uploadErrorString;
 
     QGroundControlQmlGlobal::AltMode _globalAltMode = QGroundControlQmlGlobal::AltitudeModeRelative;
 

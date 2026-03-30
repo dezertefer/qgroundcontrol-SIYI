@@ -31,13 +31,9 @@ import QGroundControl.Airmap            1.0
 import io.qt.examples.backend           1.0
 Map {
     id: _map
-
-    //-- Qt 5.9 has rotation gesture enabled by default. Here we limit the possible gestures.
     gesture.acceptedGestures:   MapGestureArea.PinchGesture | MapGestureArea.PanGesture | MapGestureArea.FlickGesture
     gesture.flickDeceleration:  3000
     plugin:                     Plugin { name: "QGroundControl" }
-
-    // https://bugreports.qt.io/browse/QTBUG-82185
     opacity:                    0.99
 
     property string mapName:                        'defaultMap'
@@ -58,10 +54,6 @@ Map {
 
 
     function setVisibleRegion(region) {
-        // TODO: Is this still necessary with Qt 5.11?
-        // This works around a bug on Qt where if you set a visibleRegion and then the user moves or zooms the map
-        // and then you set the same visibleRegion the map will not move/scale appropriately since it thinks there
-        // is nothing to do.
         _map.visibleRegion = QtPositioning.rectangle(QtPositioning.coordinate(0, 0), QtPositioning.coordinate(0, 0))
         _map.visibleRegion = region
     }
@@ -86,11 +78,9 @@ Map {
         }
     }
 
-    // Center map to gcs location
     onGcsPositionChanged: {
         if (gcsPosition.isValid && allowGCSLocationCenter && !firstGCSPositionReceived && !firstVehiclePositionReceived) {
             firstGCSPositionReceived = true
-            //-- Only center on gsc if we have no vehicle (and we are supposed to do so)
             var _activeVehicleCoordinate = _activeVehicle ? _activeVehicle.coordinate : QtPositioning.coordinate()
             if(QGroundControl.settingsManager.flyViewSettings.keepMapCenteredOnVehicle.rawValue || !_activeVehicleCoordinate.isValid)
                 center = gcsPosition
@@ -126,9 +116,6 @@ Map {
         function onRawValueChanged() { updateActiveMapType() }
     }
 
-
-
-    /// Ground Station location
     MapQuickItem {
         anchorPoint.x:  sourceItem.width / 2
         anchorPoint.y:  sourceItem.height / 2
@@ -150,8 +137,7 @@ Map {
             }
         }
     }
-    // Trapezium "map type" badge — RIGHT side, rotated trapezium
-    // Right-side map type label (rectangle)
+
     Rectangle {
         id: mapTypeBadge
         width: 80
@@ -172,7 +158,7 @@ Map {
 
         property string _labelText:
             (_provider === "Geoserver") ? qsTr("Marine map")
-          : (_provider === "Bing")      ? qsTr("Regular map")
+          : (_provider === "Bing")      ? qsTr("Aerial map")
           : qsTr("Map")
 
         Text {
@@ -182,8 +168,6 @@ Map {
             font.bold: true
 
             anchors.centerIn: parent
-
-            // Bottom → top
             rotation: -90
             transformOrigin: Item.Center
 
@@ -191,7 +175,67 @@ Map {
             verticalAlignment: Text.AlignVCenter
             wrapMode: Text.NoWrap
         }
+
+        MouseArea{
+            anchors.fill: parent
+            onClicked: {
+               if (QGroundControl.settingsManager.flightMapSettings.mapProvider.rawValue === "Bing")
+               {
+                    QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Geoserver"
+                    QGroundControl.settingsManager.flightMapSettings.mapType.value=QGroundControl.mapEngineManager.mapTypeList("Geoserver")[0]
+                }
+               else
+               {
+                   QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Bing"
+                   QGroundControl.settingsManager.flightMapSettings.mapType.value="Hybrid"
+               }
+            }
+        }
     }
 
+    Rectangle {
+        id: mapHistoryBadge
+        width: 80
+        height: 250
+        radius: 15
+        z: 9999
 
-} // Map
+        anchors.right: parent.right
+        anchors.bottom: mapTypeBadge.top
+        anchors.bottomMargin: 3
+        anchors.rightMargin: 1
+
+        color: Qt.rgba(0, 0, 0, 0.55)
+        border.color: Qt.rgba(1, 1, 1, 0.35)
+        border.width: 1
+
+        property bool _provider:
+            QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+
+        property string _labelText: _provider ? qsTr("History ☑") :  qsTr("History")
+
+        Text {
+            text: mapHistoryBadge._labelText
+            color: "white"
+            font.pixelSize: 35
+            font.bold: true
+
+            anchors.centerIn: parent
+
+            rotation: -90
+            transformOrigin: Item.Center
+
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.NoWrap
+        }
+
+        MouseArea{
+            anchors.fill: parent
+            onClicked:{
+                QGroundControl.settingsManager.flightMapSettings.enableHistory.value = !QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+                mapHistoryBadge._provider = QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+            }
+        }
+    }
+}

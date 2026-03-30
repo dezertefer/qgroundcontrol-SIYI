@@ -594,135 +594,223 @@ FlightMap {
         }
     }
 
+    // MapItemView {
+    //     id: historyDropPoints
+    //     model: backend.dropPoints
+    //     property var dummyModel : backend.dropPoints
+    //     visible: QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+    //     delegate: MapQuickItem {
+    //         coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
+
+    //         sourceItem: Item {
+    //             id: pinRoot
+    //             property real pinScale: 1.5                                  // <— scale factor
+    //             property real pinBase:  ScreenTools.defaultFontPixelHeight * 1.5
+
+    //                 // scale the whole marker (pin + badge + text)
+    //             width:  Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+    //             height: Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+
+    //             // colors
+    //             property color pinColor:  "#FFC107"   // amber
+    //             property color pinStroke: "#7A5C00"   // darker outline
+
+    //             // rating 0..5, always finite
+    //             property int ratingVal: Math.max(0, Math.min(5, Math.round(
+    //                 Number(historyDropPoints.dummyModel[index] && historyDropPoints.dummyModel[index].rating) || 0
+    //             )))
+
+    //             // Draw the whole pin + badge in one pass
+    //             Canvas {
+    //                 anchors.fill: parent
+    //                 contextType: "2d"
+    //                 renderTarget: Canvas.FramebufferObject
+
+    //                 onPaint: {
+    //                     const ctx   = getContext("2d")
+    //                     const dpr   = Screen.devicePixelRatio || 1
+    //                     const overs = 2.0
+
+    //                     if (ctx.resetTransform) ctx.resetTransform()
+    //                     ctx.clearRect(0, 0, width, height)
+    //                     ctx.scale(dpr * overs, dpr * overs)
+
+    //                     const w = width  / (dpr * overs)
+    //                     const h = height / (dpr * overs)
+
+    //                     // geometry (same as before)
+    //                     const cx   = w * 0.5
+    //                     const r    = w * 0.34           // bulb radius
+    //                     const cy   = r + h * 0.16       // bulb center y
+    //                     const tipY = h * 0.98           // sharp tip
+    //                     const k    = 1.75               // side curve depth
+
+    //                     ctx.lineJoin = "round"
+    //                     ctx.lineCap  = "round"
+
+    //                     // pin body (watertight teardrop)
+    //                     ctx.beginPath()
+    //                     ctx.moveTo(cx + r, cy)                  // start at rightmost
+    //                     ctx.arc(cx, cy, r, 0, Math.PI, true)    // over the top to leftmost
+    //                     ctx.quadraticCurveTo(cx - r * 0.30, cy + r * k, cx, tipY)
+    //                     ctx.quadraticCurveTo(cx + r * 0.30, cy + r * k, cx + r, cy)
+    //                     ctx.closePath()
+
+    //                     ctx.fillStyle = pinRoot.pinColor
+    //                     ctx.fill()
+    //                     ctx.lineWidth   = Math.max(1, r * 0.10)
+    //                     ctx.strokeStyle = pinRoot.pinStroke
+    //                     ctx.stroke()
+
+    //                     const badgeR = r * 0.75;                 // was r * 0.46
+    //                     ctx.beginPath();
+    //                     ctx.arc(cx, cy, badgeR, 0, Math.PI * 2, false);
+    //                     ctx.fillStyle = "white";
+    //                     ctx.fill();
+    //                     ctx.lineWidth   = Math.max(1, r * 0.06);
+    //                     ctx.strokeStyle = "black";
+    //                     ctx.stroke();
+
+    //                     // --- centered number with explicit width-based centering ---
+    //                     const text   = String(pinRoot.ratingVal);
+    //                     const fontPx = Math.round(badgeR * 1.40);
+    //                     ctx.font = fontPx + "px sans-serif";
+    //                     ctx.fillStyle = "black";
+    //                     ctx.textBaseline = "middle";   // vertical center
+    //                     ctx.textAlign = "left";        // we'll position X manually
+
+    //                     // measure width in current transform (scaled context)
+    //                     let tw = 0;
+    //                     try { tw = ctx.measureText(text).width || 0; } catch (e) { tw = 0; }
+
+    //                     // small optical vertical nudge
+    //                     const yNudge = Math.round(fontPx * 0.06);
+
+    //                     // optional tiny per-digit horizontal tweak (helps "1")
+    //                     let xNudge = 0;
+    //                     if (text === "1") xNudge = -fontPx * 0.08;
+
+    //                     // center by hand using measured width
+    //                     const tx = cx - (tw / 2) + xNudge;
+    //                     ctx.fillText(text, tx, cy + yNudge);
+    //                 }
+
+    //                 Component.onCompleted: requestPaint()
+    //                 onWidthChanged: requestPaint()
+    //                 onHeightChanged: requestPaint()
+    //             }
+
     MapItemView {
         id: historyDropPoints
         model: backend.dropPoints
-        property var dummyModel : backend.dropPoints
+        property var dummyModel: backend.dropPoints
         visible: QGroundControl.settingsManager.flightMapSettings.enableHistory.value
+
         delegate: MapQuickItem {
-            coordinate: QtPositioning.coordinate(historyDropPoints.dummyModel[index].lat, historyDropPoints.dummyModel[index].lon)
+            coordinate: QtPositioning.coordinate(
+                historyDropPoints.dummyModel[index].lat,
+                historyDropPoints.dummyModel[index].lon
+            )
+
+            // Let MapQuickItem do the positioning (instead of x/y hacks)
+            anchorPoint.x: pinRoot.width  / 2
+            anchorPoint.y: pinRoot.height
 
             sourceItem: Item {
                 id: pinRoot
-                property real pinScale: 1.5                                  // <— scale factor
-                property real pinBase:  ScreenTools.defaultFontPixelHeight * 1.5
 
-                    // scale the whole marker (pin + badge + text)
-                width:  Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
-                height: Math.round(pinBase * pinScale)                        // was: ScreenTools.defaultFontPixelHeight * 1.5
+                property real pinScale: 1.5*0.7
+                property real pinBase: ScreenTools.defaultFontPixelHeight * 1.5
 
-                // colors
-                property color pinColor:  "#FFC107"   // amber
-                property color pinStroke: "#7A5C00"   // darker outline
+                width:  Math.round(pinBase * pinScale)
+                height: Math.round(pinBase * pinScale)
 
                 // rating 0..5, always finite
                 property int ratingVal: Math.max(0, Math.min(5, Math.round(
                     Number(historyDropPoints.dummyModel[index] && historyDropPoints.dummyModel[index].rating) || 0
                 )))
 
-                // Draw the whole pin + badge in one pass
-                Canvas {
+                // --- The SVG pin ---
+                Image {
+                    id: pinImg
                     anchors.fill: parent
-                    contextType: "2d"
-                    renderTarget: Canvas.FramebufferObject
+                    source: "qrc:/qmlimages/GeoTagIcon"    // <- adjust extension if needed
+                    smooth: true
+                    mipmap: true
 
-                    onPaint: {
-                        const ctx   = getContext("2d")
-                        const dpr   = Screen.devicePixelRatio || 1
-                        const overs = 2.0
-
-                        if (ctx.resetTransform) ctx.resetTransform()
-                        ctx.clearRect(0, 0, width, height)
-                        ctx.scale(dpr * overs, dpr * overs)
-
-                        const w = width  / (dpr * overs)
-                        const h = height / (dpr * overs)
-
-                        // geometry (same as before)
-                        const cx   = w * 0.5
-                        const r    = w * 0.34           // bulb radius
-                        const cy   = r + h * 0.16       // bulb center y
-                        const tipY = h * 0.98           // sharp tip
-                        const k    = 1.75               // side curve depth
-
-                        ctx.lineJoin = "round"
-                        ctx.lineCap  = "round"
-
-                        // pin body (watertight teardrop)
-                        ctx.beginPath()
-                        ctx.moveTo(cx + r, cy)                  // start at rightmost
-                        ctx.arc(cx, cy, r, 0, Math.PI, true)    // over the top to leftmost
-                        ctx.quadraticCurveTo(cx - r * 0.30, cy + r * k, cx, tipY)
-                        ctx.quadraticCurveTo(cx + r * 0.30, cy + r * k, cx + r, cy)
-                        ctx.closePath()
-
-                        ctx.fillStyle = pinRoot.pinColor
-                        ctx.fill()
-                        ctx.lineWidth   = Math.max(1, r * 0.10)
-                        ctx.strokeStyle = pinRoot.pinStroke
-                        ctx.stroke()
-
-                        const badgeR = r * 0.75;                 // was r * 0.46
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, badgeR, 0, Math.PI * 2, false);
-                        ctx.fillStyle = "white";
-                        ctx.fill();
-                        ctx.lineWidth   = Math.max(1, r * 0.06);
-                        ctx.strokeStyle = "black";
-                        ctx.stroke();
-
-                        // --- centered number with explicit width-based centering ---
-                        const text   = String(pinRoot.ratingVal);
-                        const fontPx = Math.round(badgeR * 1.40);
-                        ctx.font = fontPx + "px sans-serif";
-                        ctx.fillStyle = "black";
-                        ctx.textBaseline = "middle";   // vertical center
-                        ctx.textAlign = "left";        // we'll position X manually
-
-                        // measure width in current transform (scaled context)
-                        let tw = 0;
-                        try { tw = ctx.measureText(text).width || 0; } catch (e) { tw = 0; }
-
-                        // small optical vertical nudge
-                        const yNudge = Math.round(fontPx * 0.06);
-
-                        // optional tiny per-digit horizontal tweak (helps "1")
-                        let xNudge = 0;
-                        if (text === "1") xNudge = -fontPx * 0.08;
-
-                        // center by hand using measured width
-                        const tx = cx - (tw / 2) + xNudge;
-                        ctx.fillText(text, tx, cy + yNudge);
-                    }
-
-                    Component.onCompleted: requestPaint()
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
+                    // Important for SVG: controls rasterization size (prevents odd scaling artifacts)
+                    sourceSize.width:  pinRoot.width
+                    sourceSize.height: pinRoot.height
                 }
 
-                // keep your original offset so the tip points to the map coordinate
-                x: -width / 2
-                y: -height
+                // --- Badge (white circle with outline) ---
+                Rectangle {
+                    id: badge
+                    width:  Math.round(pinRoot.width * 0.50)
+                    height: width
+                    radius: width / 2
 
+                    // position badge where it visually fits the icon
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: Math.round(pinRoot.height * 0.18)
+
+                    color: "white"
+                    border.color: "black"
+                    border.width: Math.max(1, Math.round(pinRoot.width * 0.03))
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: String(pinRoot.ratingVal)
+                        color: "black"
+                        font.pixelSize: Math.round(badge.height * 0.72)
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                // If you want click handling back:
                 // MouseArea {
                 //     anchors.fill: parent
                 //     onClicked: {
-                //         console.log("ICON PRESSED")
                 //         historyItemData = historyDropPoints.dummyModel[index]
                 //         historyItemData.index = index
                 //         mainWindow.showPopupDialogFromComponent(historyItemPopUp)
                 //     }
                 // }
             }
-
-
         }
 
         onModelChanged: {
-            console.log("Model updated", model);
+            console.log("Model updated", model)
             historyDropPoints.dummyModel = backend.dropPoints
         }
     }
+
+    //             // keep your original offset so the tip points to the map coordinate
+    //             x: -width / 2
+    //             y: -height
+
+    //             // MouseArea {
+    //             //     anchors.fill: parent
+    //             //     onClicked: {
+    //             //         console.log("ICON PRESSED")
+    //             //         historyItemData = historyDropPoints.dummyModel[index]
+    //             //         historyItemData.index = index
+    //             //         mainWindow.showPopupDialogFromComponent(historyItemPopUp)
+    //             //     }
+    //             // }
+    //         }
+
+
+    //     }
+
+    //     onModelChanged: {
+    //         console.log("Model updated", model);
+    //         historyDropPoints.dummyModel = backend.dropPoints
+    //     }
+    // }
 
     // Component {
     //     id: historyItemPopUp
