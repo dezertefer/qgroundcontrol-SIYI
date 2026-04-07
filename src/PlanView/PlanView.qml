@@ -912,10 +912,10 @@ Item {
                         GridLayout {
                             id:     gridLayout
                             flow:   GridLayout.TopToBottom
-                            rows:   4
+                            rows:   5
 
                             QGCLabel {
-                                text:               qsTr("Drop Point Rating:")
+                                text:               qsTr("Rating:")
                                 visible:            true
                                 //onVisibleChanged:   gridLayout.dynamicRows += visible ? 1 : -1
                             }
@@ -928,8 +928,13 @@ Item {
                             }
 
                             QGCLabel {
-                                text:               "GPS Coodinates:"
+                                text:               "Coordinates:"
                                 visible: true
+                            }
+
+
+                            QGCLabel {
+                                text: "Note:"
                             }
 
                             QGCButton {
@@ -1014,7 +1019,28 @@ Item {
                             }
 
                             QGCLabel {
-                                text: Number(historyItemData.lat).toFixed(3) + " " + Number(historyItemData.lon).toFixed(3)
+                                text: Number(historyItemData.lat).toFixed(7) + " " + Number(historyItemData.lon).toFixed(7)
+                            }
+
+                            TextField {
+                                id: noteField
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: ScreenTools.defaultFontPixelHeight*20
+                                font.pixelSize: ScreenTools.defaultFontPixelHeight * 0.8
+                                text: historyItemData.note ? historyItemData.note : ""
+
+                                onTextChanged: {
+                                    if (text.length > 50) {
+                                        var pos = cursorPosition
+                                        text = text.substring(0, 50)
+                                        cursorPosition = Math.min(pos, text.length)
+                                    }
+                                }
+
+                                onAccepted: {
+                                    backend.changeNote(historyItemData.index, text)
+                                    historyItemPopUpDialog.hideDialog()
+                                }
                             }
 
                             QGCButton {

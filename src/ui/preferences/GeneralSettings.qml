@@ -77,7 +77,7 @@ Rectangle {
 
                 ColumnLayout {
                     id:                         settingsColumn
-                    anchors.horizontalCenter:   parent.horizontalCenter
+                    anchors.left:               parent.left
 
                     QGCLabel {
                         id:         flyViewSectionLabel
@@ -95,7 +95,8 @@ Rectangle {
                             id:                         flyViewCol
                             anchors.margins:            _margins
                             anchors.top:                parent.top
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            //anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
                             spacing:                    _margins
 
                             FactCheckBox {
@@ -367,7 +368,8 @@ Rectangle {
                             id:                         planViewCol
                             anchors.margins:            _margins
                             anchors.top:                parent.top
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
+                            //anchors.horizontalCenter:   parent.horizontalCenter
                             spacing:                    _margins
 
                             GridLayout {
@@ -419,9 +421,11 @@ Rectangle {
                         GridLayout {
                             id:                         unitsGrid
                             anchors.topMargin:          _margins
+                            anchors.leftMargin:          _margins
                             anchors.top:                parent.top
                             Layout.fillWidth:           false
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            //anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
                             flow:                       GridLayout.TopToBottom
                             rows:                       5
 
@@ -429,6 +433,7 @@ Rectangle {
                                 model: [ qsTr("Horizontal Distance"), qsTr("Vertical Distance"), qsTr("Area"), qsTr("Speed"), qsTr("Temperature") ]
                                 QGCLabel { text: modelData }
                             }
+
                             Repeater {
                                 model:  [ QGroundControl.settingsManager.unitsSettings.horizontalDistanceUnits, QGroundControl.settingsManager.unitsSettings.verticalDistanceUnits, QGroundControl.settingsManager.unitsSettings.areaUnits, QGroundControl.settingsManager.unitsSettings.speedUnits, QGroundControl.settingsManager.unitsSettings.temperatureUnits ]
                                 FactComboBox {
@@ -463,7 +468,8 @@ Rectangle {
 
                             GridLayout {
                                 id:                         comboGrid
-                                anchors.horizontalCenter:   parent.horizontalCenter
+                                anchors.left:               parent.left
+                                //anchors.horizontalCenter:   parent.horizontalCenter
                                 columns:                    2
 
                                 QGCLabel {
@@ -599,7 +605,8 @@ Rectangle {
 
                             ColumnLayout {
                                 id:                         miscCol
-                                anchors.horizontalCenter:   parent.horizontalCenter
+                                anchors.left:               parent.left
+                                //anchors.horizontalCenter:   parent.horizontalCenter
                                 spacing:                    _margins
 
                                 FactCheckBox {
@@ -698,7 +705,8 @@ Rectangle {
                             id:                         loggingCol
                             anchors.margins:            _margins
                             anchors.top:                parent.top
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
+                            //anchors.horizontalCenter:   parent.horizontalCenter
                             spacing:                    _margins
                             FactCheckBox {
                                 id:         promptSaveLog
@@ -861,7 +869,8 @@ Rectangle {
                             anchors.topMargin:          _margins
                             anchors.top:                parent.top
                             Layout.fillWidth:           true
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
+                            //anchors.horizontalCenter:   parent.horizontalCenter
                             columns:                    3
 
                             property var  rtkSettings:      QGroundControl.settingsManager.rtkSettings
@@ -1006,7 +1015,8 @@ Rectangle {
                             anchors.topMargin:          _margins
                             anchors.top:                warningLabel.bottom
                             Layout.fillWidth:           true
-                            anchors.horizontalCenter:   parent.horizontalCenter
+                            anchors.left:               parent.left
+                            //anchors.horizontalCenter:   parent.horizontalCenter
                             columns:                    2
 
                             property var  adsbSettings:    QGroundControl.settingsManager.adsbVehicleManagerSettings
@@ -1040,6 +1050,37 @@ Rectangle {
                         }
                     }
 
+                    Item { width: 1; height: _margins }
+
+                    QGCLabel {
+                        id:         superUserSectionLabel
+                        text:       qsTr("Super User")
+                        visible:    true
+                    }
+
+                    Rectangle {
+                        Layout.preferredHeight: superUserGrid.height + (_margins * 2)
+                        Layout.preferredWidth:  superUserGrid.width + (_margins * 2)
+                        color:                  qgcPal.windowShade
+                        visible:                superUserSectionLabel.visible
+                        Layout.fillWidth:       true
+
+                        GridLayout {
+                            id:                 superUserGrid
+                            anchors.margins:    _margins
+                            anchors.top:        parent.top
+                            anchors.left:       parent.left
+                            columns:            2
+                            columnSpacing:      ScreenTools.defaultFontPixelWidth
+                            rowSpacing:         ScreenTools.defaultFontPixelHeight / 2
+
+                            FactCheckBox {
+                                text:       qsTr("Super User")
+                                fact:       QGroundControl.settingsManager.appSettings.superUserUnlocked
+                            }
+
+                        }
+                    }
                     Item { width: 1; height: _margins; visible: brandImageSectionLabel.visible }
                     QGCLabel {
                         id:         brandImageSectionLabel

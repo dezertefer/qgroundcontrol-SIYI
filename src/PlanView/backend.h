@@ -40,6 +40,7 @@ public:
     Q_INVOKABLE void changeLabel(int index, const QString &newLabel);
     Q_INVOKABLE void increaseCounter(int index);
     Q_INVOKABLE void changeRating(int index, int newRating);
+    Q_INVOKABLE void changeNote(int index, const QString &newNote);
     //Q_INVOKABLE QGeoCoordinate d();
 
     void saveToFile();

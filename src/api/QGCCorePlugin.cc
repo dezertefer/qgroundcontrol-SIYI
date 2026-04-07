@@ -315,29 +315,29 @@ void QGCCorePlugin::factValueGridCreateDefaultSettings(const QString& defaultSet
     QmlObjectListModel* column      = factValueGrid.columns()->value<QmlObjectListModel*>(0);
 
     InstrumentValueData* value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "AltitudeRelative");
-    value->setIcon("arrow-thick-up.svg");
-    value->setText(value->fact()->shortDescription());
+    value->setFact("Battery1", "Voltage");
+    //value->setIcon("arrow-thick-up.svg");
+    value->setText("Voltage");
     value->setShowUnits(true);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "DistanceToHome");
-    value->setIcon("bookmark copy 3.svg");
-    value->setText(value->fact()->shortDescription());
+    value->setFact("Vehicle", "AltitudeRelative");
+    //value->setIcon("bookmark copy 3.svg");
+    value->setText("Alt(Rel)");
     value->setShowUnits(true);
 
     rowIndex    = 0;
     column      = factValueGrid.columns()->value<QmlObjectListModel*>(1);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "ClimbRate");
-    value->setIcon("arrow-simple-up.svg");
-    value->setText(value->fact()->shortDescription());
+    value->setFact("Battery1", "MahConsumed");
+    //value->setIcon("arrow-simple-up.svg");
+    value->setText("Consumed");
     value->setShowUnits(true);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
     value->setFact("Vehicle", "GroundSpeed");
-    value->setIcon("arrow-simple-right.svg");
+    //value->setIcon("arrow-simple-right.svg");
     value->setText(value->fact()->shortDescription());
     value->setShowUnits(true);
 
@@ -361,14 +361,14 @@ void QGCCorePlugin::factValueGridCreateDefaultSettings(const QString& defaultSet
     column      = factValueGrid.columns()->value<QmlObjectListModel*>(includeFWValues ? 3 : 2);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "FlightTime");
-    value->setIcon("timer.svg");
-    value->setText(value->fact()->shortDescription());
+    value->setFact("Battery1", "InstantPower");
+    //value->setIcon("timer.svg");
+    value->setText("Watts");
     value->setShowUnits(false);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "FlightDistance");
-    value->setIcon("travel-walk.svg");
+    value->setFact("Vehicle", "DistanceToHome");
+    //value->setIcon("travel-walk.svg");
     value->setText(value->fact()->shortDescription());
     value->setShowUnits(true);
 }
@@ -477,8 +477,8 @@ QVariantList QGCCorePlugin::firstRunPromptsToShow(void)
 {
     QList<int> rgIdsToShow;
 
-    rgIdsToShow.append(firstRunPromptStdIds());
-    rgIdsToShow.append(firstRunPromptCustomIds());
+    //rgIdsToShow.append(firstRunPromptStdIds());
+    //rgIdsToShow.append(firstRunPromptCustomIds());
 
     QList<int> rgAlreadyShownIds = AppSettings::firstRunPromptsIdsVariantToList(_toolbox->settingsManager()->appSettings()->firstRunPromptIdsShown()->rawValue());
 

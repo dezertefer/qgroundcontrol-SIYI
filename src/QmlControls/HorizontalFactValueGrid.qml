@@ -65,7 +65,7 @@ T.HorizontalFactValueGrid {
                         Layout.fillWidth: true
 
                         // baseline width; we reduce it by 10%
-                        property real widthFactor:   0.7
+                        property real widthFactor:   0.42
                         property int  valueBasePx:   ScreenTools.defaultFontPixelWidth * 20
                         property real valueMinWidth: valueBasePx * widthFactor
 
@@ -133,69 +133,69 @@ T.HorizontalFactValueGrid {
                 }
             }
 
-            ColumnLayout {
-                Layout.bottomMargin:    1
-                Layout.fillHeight:      true
-                Layout.preferredWidth:  ScreenTools.minTouchPixels / 2
-                spacing:                1
-                visible:                settingsUnlocked
-                enabled:                settingsUnlocked
+            // ColumnLayout {
+            //     Layout.bottomMargin:    1
+            //     Layout.fillHeight:      true
+            //     Layout.preferredWidth:  ScreenTools.minTouchPixels / 2
+            //     spacing:                1
+            //     visible:                settingsUnlocked && QGroundControl.settingsManager.appSettings.superUserUnlocked
+            //     enabled:                settingsUnlocked && QGroundControl.settingsManager.appSettings.superUserUnlocked
 
-                QGCButton {
-                    Layout.fillHeight:      true
-                    Layout.preferredHeight: ScreenTools.minTouchPixels
-                    Layout.preferredWidth:  parent.width
-                    text:                   qsTr("+")
-                    enabled: _root.columns.count < 3
-                    onClicked: {
-                        if (_root.columns.count < 3) {     // *** limit columns to 3
-                            appendColumn()
-                        } else {
-                            qgcApp.showAppMessage(qsTr("Maximum of 3 columns reached"))
-                        }
-                    }
-                }
+            //     QGCButton {
+            //         Layout.fillHeight:      true
+            //         Layout.preferredHeight: ScreenTools.minTouchPixels
+            //         Layout.preferredWidth:  parent.width
+            //         text:                   qsTr("+")
+            //         enabled: _root.columns.count < 3
+            //         onClicked: {
+            //             if (_root.columns.count < 3) {     // *** limit columns to 3
+            //                 appendColumn()
+            //             } else {
+            //                 qgcApp.showAppMessage(qsTr("Maximum of 3 columns reached"))
+            //             }
+            //         }
+            //     }
 
-                QGCButton {
-                    Layout.fillHeight:      true
-                    Layout.preferredHeight: ScreenTools.minTouchPixels
-                    Layout.preferredWidth:  parent.width
-                    text:                   qsTr("-")
-                    enabled:                _root.columns.count > 1
-                    onClicked:              deleteLastColumn()
-                }
-            }
+            //     QGCButton {
+            //         Layout.fillHeight:      true
+            //         Layout.preferredHeight: ScreenTools.minTouchPixels
+            //         Layout.preferredWidth:  parent.width
+            //         text:                   qsTr("-")
+            //         enabled:                _root.columns.count > 1
+            //         onClicked:              deleteLastColumn()
+            //     }
+            // }
         }
 
-        RowLayout {
-            Layout.preferredHeight: ScreenTools.minTouchPixels / 2
-            Layout.fillWidth:       true
-            spacing:                1
-            visible:                settingsUnlocked
-            enabled:                settingsUnlocked
+        // RowLayout {
+        //     Layout.preferredHeight: ScreenTools.minTouchPixels / 2
+        //     Layout.fillWidth:       true
+        //     spacing:                1
+        //     visible:                settingsUnlocked && QGroundControl.settingsManager.appSettings.superUserUnlocked
+        //     enabled:                settingsUnlocked && QGroundControl.settingsManager.appSettings.superUserUnlocked
 
-            QGCButton {
-                Layout.fillWidth:       true
-                Layout.preferredHeight: parent.height
-                text:                   qsTr("+")
-                enabled: _root.rowCount < 5
-                onClicked: {
-                    if (_root.rowCount < 5) {          // *** limit rows to 5
-                        appendRow()
-                    } else {
-                        qgcApp.showAppMessage(qsTr("Maximum of 5 rows reached"))
-                    }
-                }
-            }
+        //     QGCButton {
+        //         Layout.fillWidth:       true
+        //         Layout.preferredHeight: parent.height
+        //         text:                   qsTr("+")
+        //         enabled: _root.rowCount < 5
+        //         onClicked: {
+        //             if (_root.rowCount < 5) {          // *** limit rows to 5
+        //                 appendRow()
+        //             } else {
+        //                 qgcApp.showAppMessage(qsTr("Maximum of 5 rows reached"))
+        //             }
+        //         }
+        //     }
 
-            QGCButton {
-                Layout.fillWidth:       true
-                Layout.preferredHeight: parent.height
-                text:                   qsTr("-")
-                enabled:                _root.rowCount > 1
-                onClicked:              deleteLastRow()
-            }
-        }
+        //     QGCButton {
+        //         Layout.fillWidth:       true
+        //         Layout.preferredHeight: parent.height
+        //         text:                   qsTr("-")
+        //         enabled:                _root.rowCount > 1
+        //         onClicked:              deleteLastRow()
+        //     }
+        // }
     }
 
     QGCMouseArea {
@@ -203,7 +203,7 @@ T.HorizontalFactValueGrid {
         y:          labelValueColumnLayout.y
         width:      labelValueColumnLayout.width
         height:     labelValueColumnLayout.height
-        visible:    settingsUnlocked
+        visible:    settingsUnlocked && QGroundControl.settingsManager.appSettings.superUserUnlocked.rawValue
         cursorShape:Qt.PointingHandCursor
 
         property var mappedLabelValueColumnLayoutPosition: _root.mapFromItem(labelValueColumnLayout, labelValueColumnLayout.x, labelValueColumnLayout.y)

@@ -67,7 +67,7 @@ Rectangle {
                 width: _root.width - ScreenTools.defaultFontPixelWidth * 0.8
                 height: ScreenTools.smallFontPointSize*1.2*6
                 radius: flickable.anchors.margins
-                color: "#3402bf"
+                color: "#1e90ff"
                 QGCLabel {
                     id:                     titleLabel
                     anchors.left:           parent.left

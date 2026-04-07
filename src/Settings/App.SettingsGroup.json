@@ -9,7 +9,7 @@
     "type":             "uint32",
     "enumStrings":      "ArduPilot,PX4 Pro,Mavlink Generic",
     "enumValues":       "3,12,0",
-    "default":     12
+    "default":     3
 },
 {
     "name":             "offlineEditingVehicleClass",
@@ -325,6 +325,12 @@
     "longDesc":  "Host name to forward mavlink to. i.e: localhost:14445",
     "type":             "string",
     "default":     "localhost:14445"
+},
+{
+    "name": "superUserUnlocked",
+    "shortDesc": "Super User Password",
+    "type": "bool",
+    "default": false
 }
 ]
 }

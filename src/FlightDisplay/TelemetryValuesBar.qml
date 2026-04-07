@@ -35,7 +35,7 @@ Rectangle {
         //anchors.right:      parent.right
 
          RowLayout {
-            visible: mouseArea.containsMouse || valueArea.settingsUnlocked
+            visible: mouseArea.containsMouse && QGroundControl.settingsManager.appSettings.superUserUnlocked.rawValue
 
             // QGCColoredImage {
             //     source:             "/res/layout-bottom.svg"

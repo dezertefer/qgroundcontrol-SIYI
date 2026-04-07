@@ -406,6 +406,7 @@ void BackEnd::readDropPoints()
                     dropPointMap["lon"] = dropPointObj["lon"].toDouble();
                     dropPointMap["label"] = dropPointObj["label"].toString();
                     dropPointMap["counter"] = dropPointObj["counter"].toInt();
+                    dropPointMap["note"] = dropPointObj["note"].toString().left(50);
                     // Display the drop point in the console
                     qDebug() << "Drop Point:";
                     qDebug() << "Date:" << dropPointMap["date"].toString();
@@ -414,6 +415,7 @@ void BackEnd::readDropPoints()
                     qDebug() << "Longitude:" << dropPointMap["lon"].toDouble();
                     qDebug() << "Label:" << dropPointMap["label"].toString();
                     qDebug() << "Counter:" << dropPointMap["counter"].toInt();
+                    qDebug() << "Counter:" << dropPointMap["note"].toString().left(50);
                     qDebug() << "-------------------------";
 
                     dropPointList.append(dropPointMap);
@@ -473,6 +475,7 @@ void BackEnd::addDropPoint(const QString &label, double lat, double lon) {
     newDropPoint["lon"] = lon;
     newDropPoint["label"] = label;
     newDropPoint["counter"] = 1;  // New point, so counter starts at 1
+    newDropPoint["note"] = "";
 
     m_dropPoints.append(newDropPoint);
     emit dropPointsChanged();
@@ -532,6 +535,7 @@ void BackEnd::saveToFile() {
             dropPointObj["lon"] = pointMap["lon"].toDouble();
             dropPointObj["label"] = pointMap["label"].toString();
             dropPointObj["counter"] = pointMap["counter"].toInt();
+            dropPointObj["note"] = pointMap["note"].toString().left(50);
             dropPointsArray.append(dropPointObj);
         }
 
@@ -540,6 +544,16 @@ void BackEnd::saveToFile() {
         file.close();
     } else {
         qDebug() << "Failed to open file for saving!";
+    }
+}
+
+void BackEnd::changeNote(int index, const QString &newNote) {
+    if (index >= 0 && index < m_dropPoints.size()) {
+        QVariantMap map = m_dropPoints[index].toMap();
+        map["note"] = newNote.left(50);
+        m_dropPoints[index] = map;
+        emit dropPointsChanged();
+        saveToFile();
     }
 }
 
