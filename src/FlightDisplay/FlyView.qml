@@ -57,6 +57,10 @@ Item {
     property real   _rightPanelWidth:       ScreenTools.defaultFontPixelWidth * 30
     property var    _mapControl:            mapControl
 
+    property real   _telemetryBarHeight: ScreenTools.defaultFontPixelHeight * 4.2
+    property real   _telemetryBarMargin: _toolsMargin
+    property real   _pipBottomSafeMargin: _telemetryBarHeight + (_telemetryBarMargin * 2)
+
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
 
@@ -70,8 +74,14 @@ Item {
 
     QGCToolInsets {
         id:                     _toolInsets
+
+        // PiP should no longer push the telemetry bar left/right.
+        // Keep these only if other widgets still need to know about PiP.
         leftEdgeBottomInset:    _pipOverlay.visible ? _pipOverlay.x + _pipOverlay.width : 0
         bottomEdgeLeftInset:    _pipOverlay.visible ? parent.height - _pipOverlay.y : 0
+
+        // New reserved bottom area for the fixed telemetry strip.
+        bottomEdgeCenterInset:  _telemetryBarHeight + (_telemetryBarMargin * 2)
     }
 
     FlyViewWidgetLayer {
@@ -84,6 +94,9 @@ Item {
         parentToolInsets:       _toolInsets
         mapControl:             _mapControl
         visible:                !QGroundControl.videoManager.fullScreen
+
+        telemetryBarHeight:     _telemetryBarHeight
+        telemetryBarMargin:     _telemetryBarMargin
     }
 
     FlyViewCustomLayer {
@@ -152,7 +165,8 @@ Item {
         id:                     _pipOverlay
         anchors.left:           parent.left
         anchors.bottom:         parent.bottom
-        anchors.margins:        _toolsMargin
+        //anchors.leftMargin:     _toolsMargin
+        anchors.bottomMargin:   _pipBottomSafeMargin/2
         item1IsFullSettingsKey: "MainFlyWindowIsMap"
         item1:                  mapControl
         item2:                  QGroundControl.videoManager.hasVideo ? videoControl : null

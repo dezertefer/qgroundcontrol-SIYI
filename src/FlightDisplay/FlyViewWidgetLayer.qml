@@ -49,6 +49,9 @@ Item {
     property rect   _centerViewport:        Qt.rect(0, 0, width, height)
     property real   _rightPanelWidth:       ScreenTools.defaultFontPixelWidth * 30
 
+    property real telemetryBarHeight: ScreenTools.defaultFontPixelHeight * 2
+    property real telemetryBarMargin: _toolsMargin
+
     QGCToolInsets {
         id:                     _totalToolInsets
         leftEdgeTopInset:       toolStrip.leftInset
@@ -61,7 +64,7 @@ Item {
         topEdgeCenterInset:     parentToolInsets.topEdgeCenterInset
         topEdgeRightInset:      parentToolInsets.topEdgeRightInset
         bottomEdgeLeftInset:    parentToolInsets.bottomEdgeLeftInset
-        bottomEdgeCenterInset:  mapScale.centerInset
+        bottomEdgeCenterInset:  Math.max(mapScale.centerInset, telemetryPanel.visible ? telemetryPanel.height + telemetryPanel.anchors.bottomMargin : 0)
         bottomEdgeRightInset:   0
     }
 
@@ -148,71 +151,12 @@ Item {
     // }
 
     TelemetryValuesBar {
-        id:                 telemetryPanel
-        x:                  recalcXPosition()
-        anchors.margins:    _toolsMargin
-
-        // States for custom layout support
-        states: [
-            State {
-                name: "bottom"
-                when: telemetryPanel.bottomMode
-
-                AnchorChanges {
-                    target: telemetryPanel
-                    anchors.top: undefined
-                    anchors.bottom: parent.bottom
-                    anchors.right: undefined
-                    anchors.verticalCenter: undefined
-                }
-
-                PropertyChanges {
-                    target: telemetryPanel
-                    x: recalcXPosition()
-                }
-            }
-
-            // State {
-            //     name: "right-video"
-            //     when: !telemetryPanel.bottomMode && photoVideoControl.visible
-
-            //     AnchorChanges {
-            //         target: telemetryPanel
-            //         anchors.top: photoVideoControl.bottom
-            //         anchors.bottom: undefined
-            //         anchors.right: parent.right
-            //         anchors.verticalCenter: undefined
-            //     }
-            // },
-
-            // State {
-            //     name: "right-novideo"
-            //     when: !telemetryPanel.bottomMode && !photoVideoControl.visible
-
-            //     AnchorChanges {
-            //         target: telemetryPanel
-            //         anchors.top: undefined
-            //         anchors.bottom: undefined
-            //         anchors.right: parent.right
-            //         anchors.verticalCenter: parent.verticalCenter
-            //     }
-            // }
-        ]
-
-        function recalcXPosition() {
-            // First try centered
-            var halfRootWidth   = _root.width / 2
-            var halfPanelWidth  = telemetryPanel.width / 2
-            var leftX           = (halfRootWidth - halfPanelWidth) - _toolsMargin
-            var rightX          = (halfRootWidth + halfPanelWidth) + _toolsMargin
-            if (leftX >= parentToolInsets.leftEdgeBottomInset || rightX <= parentToolInsets.rightEdgeBottomInset ) {
-                // It will fit in the horizontalCenter
-                return halfRootWidth - halfPanelWidth
-            } else {
-                // Anchor to left edge
-                return parentToolInsets.leftEdgeBottomInset + _toolsMargin
-            }
-        }
+        id:                     telemetryPanel
+        anchors.left:           parent.left
+        anchors.right:          parent.right
+        anchors.bottom:         parent.bottom
+        height:                 _root.height * 0.08//Math.max(ScreenTools.defaultFontPixelHeight * 3.0, _root.height * 0.08)
+        z:                      QGroundControl.zOrderWidgets + 1
     }
 
     //-- Virtual Joystick
