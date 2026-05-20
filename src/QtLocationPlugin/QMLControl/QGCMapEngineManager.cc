@@ -42,7 +42,7 @@ QGCMapEngineManager::QGCMapEngineManager(QGCApplication* app, QGCToolbox* toolbo
     , _setID(UINT64_MAX)
     , _freeDiskSpace(0)
     , _diskSpace(0)
-    , _fetchElevation(true)
+    , _fetchElevation(false)
     , _actionProgress(0)
     , _importAction(ActionNone)
     , _importReplace(false)
@@ -85,15 +85,27 @@ QGCMapEngineManager::updateForCurrentView(double lon0, double lat0, double lon1,
         QGCTileSet set = QGCMapEngine::getTileCount(z, lon0, lat0, lon1, lat1, mapName);
         _imageSet += set;
     }
-    if (_fetchElevation) {
-        QGCTileSet set = QGCMapEngine::getTileCount(1, lon0, lat0, lon1, lat1, "Airmap Elevation");
-        _elevationSet += set;
-    }
+
+    qDebug() << "[OfflineMaps] current view totals"
+             << "map:" << mapName
+             << "minZoom:" << minZoom
+             << "maxZoom:" << maxZoom
+             << "imageTiles:" << _imageSet.tileCount
+             << "imageSize:" << _imageSet.tileSize
+             << "elevationTiles:" << _elevationSet.tileCount
+             << "elevationSize:" << _elevationSet.tileSize;
+
+    // if (_fetchElevation) {
+    //     QGCTileSet set = QGCMapEngine::getTileCount(1, lon0, lat0, lon1, lat1, "Airmap Elevation");
+    //     _elevationSet += set;
+    // }
 
     emit tileCountChanged();
     emit tileSizeChanged();
 
     qCDebug(QGCMapEngineManagerLog) << "updateForCurrentView" << lat0 << lon0 << lat1 << lon1 << minZoom << maxZoom;
+
+
 }
 
 //-----------------------------------------------------------------------------
@@ -275,24 +287,35 @@ QGCMapEngineManager::deleteTileSet(QGCCachedTileSet* tileSet)
 {
     qCDebug(QGCMapEngineManagerLog) << "Deleting tile set " << tileSet->name();
     //-- If deleting default set, delete it all
-    if(tileSet->defaultSet()) {
-        for(int i = 0; i < _tileSets.count(); i++ ) {
-            QGCCachedTileSet* set = qobject_cast<QGCCachedTileSet*>(_tileSets.get(i));
-            if(set) {
-                set->setDeleting(true);
-            }
-        }
-        QGCResetTask* task = new QGCResetTask();
-        connect(task, &QGCResetTask::resetCompleted, this, &QGCMapEngineManager::_resetCompleted);
-        connect(task, &QGCMapTask::error, this, &QGCMapEngineManager::taskError);
+    if (tileSet->defaultSet()) {
+        tileSet->setDeleting(true);
+
+        QGCClearDefaultTileSetTask* task = new QGCClearDefaultTileSetTask();
+        connect(task, &QGCClearDefaultTileSetTask::defaultTileSetCleared,
+                this, &QGCMapEngineManager::_defaultTileSetCleared);
+        connect(task, &QGCMapTask::error,
+                this, &QGCMapEngineManager::taskError);
+
         getQGCMapEngine()->addTask(task);
     } else {
         tileSet->setDeleting(true);
+
         QGCDeleteTileSetTask* task = new QGCDeleteTileSetTask(tileSet->setID());
-        connect(task, &QGCDeleteTileSetTask::tileSetDeleted, this, &QGCMapEngineManager::_tileSetDeleted);
-        connect(task, &QGCMapTask::error, this, &QGCMapEngineManager::taskError);
+        connect(task, &QGCDeleteTileSetTask::tileSetDeleted,
+                this, &QGCMapEngineManager::_tileSetDeleted);
+        connect(task, &QGCMapTask::error,
+                this, &QGCMapEngineManager::taskError);
+
         getQGCMapEngine()->addTask(task);
     }
+}
+
+void QGCMapEngineManager::_defaultTileSetCleared()
+{
+    qCDebug(QGCMapEngineManagerLog) << "Default tile set cleared";
+
+    // Reload tile set list and default cache totals
+    loadTileSets();
 }
 
 //-----------------------------------------------------------------------------
@@ -368,6 +391,9 @@ QGCMapEngineManager::taskError(QGCMapTask::TaskType type, QString error)
         break;
     case QGCMapTask::taskExport:
         task = "Export Tile Sets";
+        break;
+    case QGCMapTask::taskClearDefaultTileSet:
+        task = "Clear Default Tile Set";
         break;
     default:
         task = "Database Error";

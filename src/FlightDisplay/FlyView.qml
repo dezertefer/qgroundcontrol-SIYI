@@ -111,26 +111,29 @@ Item {
     GuidedActionsController {
         id:                 guidedActionsController
         missionController:  _missionController
+        confirmDialog:      guidedActionConfirm
         actionList:         _guidedActionList
         altitudeSlider:     _guidedAltSlider
     }
 
-    /*GuidedActionConfirm {
+    GuidedActionConfirm {
         id:                         guidedActionConfirm
         anchors.margins:            _margins
         anchors.bottom:             parent.bottom
+        anchors.bottomMargin:       _telemetryBarHeight + _telemetryBarMargin
         anchors.horizontalCenter:   parent.horizontalCenter
-        z:                          QGroundControl.zOrderTopMost
+        z:                          QGroundControl.zOrderTopMost + 10
         guidedController:           _guidedController
         altitudeSlider:             _guidedAltSlider
-    }*/
+    }
 
     GuidedActionList {
         id:                         guidedActionList
         anchors.margins:            _margins
         anchors.bottom:             parent.bottom
+        anchors.bottomMargin:       _telemetryBarHeight + _telemetryBarMargin
         anchors.horizontalCenter:   parent.horizontalCenter
-        z:                          QGroundControl.zOrderTopMost
+        z:                          QGroundControl.zOrderTopMost + 9
         guidedController:           _guidedController
     }
 

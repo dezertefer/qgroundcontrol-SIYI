@@ -9,6 +9,7 @@
 
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
+#include <QtGlobal>
 
 #include "MapProvider.h"
 
@@ -89,20 +90,52 @@ int MapProvider::lat2tileY(const double lat, const int z) const {
         2.0 * pow(2.0, z)));
 }
 
-QGCTileSet MapProvider::getTileCount(const int zoom, const double topleftLon,
-                                     const double topleftLat, const double bottomRightLon,
-                                     const double bottomRightLat) const {
+QGCTileSet MapProvider::getTileCount(const int zoom,
+                                     const double topleftLon,
+                                     const double topleftLat,
+                                     const double bottomRightLon,
+                                     const double bottomRightLat) const
+{
     QGCTileSet set;
-    set.tileX0 = long2tileX(topleftLon, zoom);
-    set.tileY0 = lat2tileY(topleftLat, zoom);
-    set.tileX1 = long2tileX(bottomRightLon, zoom);
-    set.tileY1 = lat2tileY(bottomRightLat, zoom);
 
-    set.tileCount = (static_cast<quint64>(set.tileX1) -
-                     static_cast<quint64>(set.tileX0) + 1) *
-                    (static_cast<quint64>(set.tileY1) -
-                     static_cast<quint64>(set.tileY0) + 1);
+    const int z = qBound(1, zoom, 20);
+    const int maxTile = (1 << z) - 1;
 
-    set.tileSize = getAverageSize() * set.tileCount;
+    int x0 = long2tileX(topleftLon, z);
+    int y0 = lat2tileY(topleftLat, z);
+    int x1 = long2tileX(bottomRightLon, z);
+    int y1 = lat2tileY(bottomRightLat, z);
+
+    x0 = qBound(0, x0, maxTile);
+    x1 = qBound(0, x1, maxTile);
+    y0 = qBound(0, y0, maxTile);
+    y1 = qBound(0, y1, maxTile);
+
+    if (x1 < x0) {
+        qSwap(x0, x1);
+    }
+
+    if (y1 < y0) {
+        qSwap(y0, y1);
+    }
+
+    set.tileX0 = x0;
+    set.tileX1 = x1;
+    set.tileY0 = y0;
+    set.tileY1 = y1;
+
+    const quint64 xCount = static_cast<quint64>(x1 - x0 + 1);
+    const quint64 yCount = static_cast<quint64>(y1 - y0 + 1);
+
+    set.tileCount = xCount * yCount;
+    set.tileSize = static_cast<quint64>(getAverageSize()) * set.tileCount;
+
+    qDebug() << "[MapProvider::getTileCount]"
+             << "zoom:" << z
+             << "lon/lat:" << topleftLon << topleftLat << bottomRightLon << bottomRightLat
+             << "tiles:" << x0 << y0 << x1 << y1
+             << "count:" << set.tileCount
+             << "size:" << set.tileSize;
+
     return set;
 }

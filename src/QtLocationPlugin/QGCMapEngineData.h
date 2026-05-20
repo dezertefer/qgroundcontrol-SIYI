@@ -122,7 +122,8 @@ public:
         taskPruneCache,
         taskReset,
         taskExport,
-        taskImport
+        taskImport,
+        taskClearDefaultTileSet
     };
 
     QGCMapTask(TaskType type)
@@ -385,6 +386,25 @@ public:
 
 signals:
     void resetCompleted();
+};
+
+class QGCClearDefaultTileSetTask : public QGCMapTask
+{
+    Q_OBJECT
+
+public:
+    QGCClearDefaultTileSetTask()
+        : QGCMapTask(QGCMapTask::taskClearDefaultTileSet)
+    {
+    }
+
+    void setDefaultTileSetCleared()
+    {
+        emit defaultTileSetCleared();
+    }
+
+signals:
+    void defaultTileSetCleared();
 };
 
 //-----------------------------------------------------------------------------

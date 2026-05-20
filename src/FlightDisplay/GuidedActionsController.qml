@@ -306,9 +306,17 @@ Item {
     }
 
     function closeAll() {
-        confirmDialog.visible =     false
-        actionList.visible =        false
-        altitudeSlider.visible =    false
+        if (confirmDialog) {
+            confirmDialog.visible = false
+        }
+
+        if (actionList) {
+            actionList.visible = false
+        }
+
+        if (altitudeSlider) {
+            altitudeSlider.visible = false
+        }
     }
 
     // Called when an action is about to be executed in order to confirm

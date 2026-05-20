@@ -129,6 +129,7 @@ private slots:
     void _resetCompleted        ();
     void _actionCompleted       ();
     void _actionProgressHandler (int percentage);
+    void _defaultTileSetCleared ();
 
 private:
     void _updateDiskFreeSpace   ();

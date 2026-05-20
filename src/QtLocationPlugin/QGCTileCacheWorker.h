@@ -63,6 +63,7 @@ private:
     void        _getTileDownloadList    (QGCMapTask* mtask);
     void        _updateTileDownloadState(QGCMapTask* mtask);
     void        _deleteTileSet          (QGCMapTask* mtask);
+    void        _clearDefaultTileSet    (QGCMapTask* mtask);
     void        _renameTileSet          (QGCMapTask* mtask);
     void        _resetCacheDatabase     (QGCMapTask* mtask);
     void        _pruneCache             (QGCMapTask* mtask);

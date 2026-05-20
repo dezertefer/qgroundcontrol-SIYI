@@ -188,6 +188,9 @@ QGCCacheWorker::_runTask(QGCMapTask *task)
         case QGCMapTask::taskDeleteTileSet:
             _deleteTileSet(task);
             return;
+        case QGCMapTask::taskClearDefaultTileSet:
+            _clearDefaultTileSet(task);
+            return;
         case QGCMapTask::taskRenameTileSet:
             _renameTileSet(task);
             return;
@@ -671,6 +674,69 @@ QGCCacheWorker::_deleteTileSet(qulonglong id)
     s = QString("DELETE FROM SetTiles WHERE setID = %1").arg(id);
     query.exec(s);
     _updateTotals();
+}
+
+void QGCCacheWorker::_clearDefaultTileSet(QGCMapTask* mtask)
+{
+    if (!_testTask(mtask)) {
+        return;
+    }
+
+    QGCClearDefaultTileSetTask* task = static_cast<QGCClearDefaultTileSetTask*>(mtask);
+
+    const quint64 defaultSetID = _getDefaultTileSet();
+
+    QSqlQuery query(*_db);
+    QString s;
+
+    _db->transaction();
+
+    // Delete only tiles that belong to the default set and are not shared
+    // with any manually-created tile set.
+    s = QString(
+            "DELETE FROM Tiles "
+            "WHERE tileID IN ("
+            "SELECT A.tileID "
+            "FROM SetTiles A "
+            "JOIN SetTiles B ON A.tileID = B.tileID "
+            "WHERE B.setID = %1 "
+            "GROUP BY A.tileID "
+            "HAVING COUNT(A.tileID) = 1"
+            ")"
+            ).arg(defaultSetID);
+
+    if (!query.exec(s)) {
+        _db->rollback();
+        task->setError(QStringLiteral("Error clearing default tile cache: ") + query.lastError().text());
+        return;
+    }
+
+    // Remove dangling references from SetTiles.
+    // This keeps SetTiles clean after deleting default-only tiles.
+    s = QString(
+            "DELETE FROM SetTiles "
+            "WHERE setID = %1 "
+            "AND tileID NOT IN (SELECT tileID FROM Tiles)"
+            ).arg(defaultSetID);
+
+    if (!query.exec(s)) {
+        _db->rollback();
+        task->setError(QStringLiteral("Error cleaning default tile references: ") + query.lastError().text());
+        return;
+    }
+
+    // Do not delete TileSets row for the default set.
+    // Do not touch manually-created TileSets.
+    // Do not touch TilesDownload for manual sets.
+
+    if (!_db->commit()) {
+        task->setError(QStringLiteral("Error committing default tile cache clear: ") + _db->lastError().text());
+        return;
+    }
+
+    _updateTotals();
+
+    task->setDefaultTileSetCleared();
 }
 
 //-----------------------------------------------------------------------------

@@ -18,15 +18,17 @@ import QGroundControl.Palette       1.0
 
 Rectangle {
     id:                     _root
-    Layout.minimumWidth:    mainLayout.width + (_margins * 2)
-    Layout.preferredHeight: mainLayout.height + (_margins * 2)
+    width:                  mainLayout.width + (_margins * 2)
+    height:                 mainLayout.height + (_margins * 2)
     radius:                 ScreenTools.defaultFontPixelWidth / 2
     color:                  qgcPal.windowShadeLight
+    border.width:           1
+    border.color:           qgcPal.windowShade
     visible:                false
 
     property var    guidedController
     property var    altitudeSlider
-    property string title                                       // Currently unused
+    property string title
     property alias  message:            messageText.text
     property int    action
     property var    actionData
@@ -36,7 +38,7 @@ Rectangle {
     property alias  optionChecked:      optionCheckBox.checked
 
     property real _margins:         ScreenTools.defaultFontPixelWidth / 2
-    property bool _emergencyAction: action === guidedController.actionEmergencyStop
+    property bool _emergencyAction: guidedController && action === guidedController.actionEmergencyStop
 
     Component.onCompleted: guidedController.confirmDialog = this
 
@@ -78,7 +80,7 @@ Rectangle {
 
     ColumnLayout {
         id:                         mainLayout
-        anchors.horizontalCenter:   parent.horizontalCenter
+        anchors.centerIn:           parent
         spacing:                    _margins
 
         QGCLabel {

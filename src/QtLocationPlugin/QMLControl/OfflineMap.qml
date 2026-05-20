@@ -426,15 +426,29 @@ Item {
         QGCViewMessage {
             id:  deleteConfirmationDialog
             message: {
-                if(offlineMapView._currentSelection.defaultSet)
-                    return qsTr("This will delete all tiles INCLUDING the tile sets you have created yourself.\n\nIs this really what you want?");
-                else
-                    return qsTr("Delete %1 and all its tiles.\n\nIs this really what you want?").arg(offlineMapView._currentSelection.name);
+                if (!offlineMapView._currentSelection) {
+                    return ""
+                }
+
+                if (offlineMapView._currentSelection.defaultSet) {
+                    return qsTr("Clear only the system-wide default map cache?\n\nSaved offline tile sets will not be deleted.")
+                }
+
+                return qsTr("Delete %1 and all its tiles.\n\nIs this really what you want?").arg(offlineMapView._currentSelection.name)
             }
+
             function accept() {
+                if (!offlineMapView._currentSelection) {
+                    deleteConfirmationDialog.hideDialog()
+                    showList()
+                    return
+                }
+
                 QGroundControl.mapEngineManager.deleteTileSet(offlineMapView._currentSelection)
+
                 deleteConfirmationDialog.hideDialog()
                 leaveInfoView()
+                offlineMapView._currentSelection = null
                 showList()
             }
         }
@@ -489,7 +503,7 @@ Item {
             Rectangle {
                 id:                 infoView
                 anchors.margins:    ScreenTools.defaultFontPixelHeight
-                anchors.right:      parent.right
+                anchors.left:      parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 width:              tileInfoColumn.width  + (ScreenTools.defaultFontPixelWidth  * 2)
                 height:             tileInfoColumn.height + (ScreenTools.defaultFontPixelHeight * 2)
@@ -616,7 +630,7 @@ Item {
                             }
                         }
                         QGCButton {
-                            text:       qsTr("Delete")
+                            text:       _defaultSet ? qsTr("Clear Cache") : qsTr("Delete")
                             width:      ScreenTools.defaultFontPixelWidth * (infoView._extraButton ? 6 : 10)
                             onClicked:  mainWindow.showComponentDialog(deleteConfirmationDialogComponent, qsTr("Confirm Delete"), mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.No)
                         }
@@ -842,16 +856,16 @@ Item {
                                 }
                             }
                         }
-                        QGCCheckBox {
-                            anchors.left:   parent.left
-                            anchors.right:  parent.right
-                            text:           qsTr("Fetch elevation data")
-                            checked:        QGroundControl.mapEngineManager.fetchElevation
-                            onClicked: {
-                                QGroundControl.mapEngineManager.fetchElevation = checked
-                                handleChanges()
-                            }
-                        }
+                        // QGCCheckBox {
+                        //     anchors.left:   parent.left
+                        //     anchors.right:  parent.right
+                        //     text:           qsTr("Fetch elevation data")
+                        //     checked:        QGroundControl.mapEngineManager.fetchElevation
+                        //     onClicked: {
+                        //         QGroundControl.mapEngineManager.fetchElevation = checked
+                        //         handleChanges()
+                        //     }
+                        // }
                     }
 
                     Rectangle {
