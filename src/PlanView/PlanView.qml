@@ -471,7 +471,15 @@ Item {
             && _missionController.currentPlanViewSeqNum === 0
             && !_missionController.containsItems) {
 
-            var vehicleCoordinate = globals.activeVehicle.coordinate
+            var vehicleRaw = globals.activeVehicle.coordinate
+
+            // Freeze the vehicle coordinate at the moment of plan creation.
+            // Keep altitude too, because backend.calculateC() uses A.altitude().
+            var vehicleCoordinate = QtPositioning.coordinate(
+                Number(vehicleRaw.latitude),
+                Number(vehicleRaw.longitude),
+                Number(vehicleRaw.altitude)
+            )
 
             // Feed A/B and compute C/D (backend sets lat/lon; we'll set REL altitudes here)
             backend.A = vehicleCoordinate
@@ -492,27 +500,34 @@ Item {
             function _setLastItemAltRel(relAlt) {
                 var n = _missionController.visualItems.count
                 if (!n) return
+
                 var vi = _missionController.visualItems.get(n - 1)
+
                 try {
                     if (vi.hasOwnProperty("altitudeMode")) {
                         vi.altitudeMode = QGroundControl.AltitudeModeRelative
                     }
+
                     if (vi.altitude && vi.altitude.hasOwnProperty("rawValue")) {
                         vi.altitude.rawValue = relAlt
                     }
-                } catch (e) { console.log("setLastItemAltRel failed:", e) }
+                } catch (e) {
+                    console.log("setLastItemAltRel failed:", e)
+                }
             }
+
             function coordsAlmostEqual(c1, c2) {
                 if (!c1 || !c2) return false
+
                 var mPerDeg = 111320
                 var dLat = (c1.latitude - c2.latitude) * mPerDeg
                 var meanLatRad = ((c1.latitude + c2.latitude) * 0.5) * Math.PI / 180
                 var dLon = (c1.longitude - c2.longitude) * mPerDeg * Math.cos(meanLatRad)
-                var horiz = Math.sqrt(dLat*dLat + dLon*dLon)
-                var dAlt = Math.abs((c1.altitude||0) - (c2.altitude||0))
+                var horiz = Math.sqrt(dLat * dLat + dLon * dLon)
+                var dAlt = Math.abs((c1.altitude || 0) - (c2.altitude || 0))
+
                 return horiz < 0.5 && dAlt < 0.5
             }
-            // uses your existing toRelative(c)
 
             var nextIndex = 1
 
@@ -520,15 +535,21 @@ Item {
             _missionController.insertTakeoffItem(vehicleCoordinate, nextIndex++, true)
             _setLastItemAltRel(takeoffRel)
 
-            // (2) WP @ A (placeholder) -> worker sets slow/takeoff speed here (index 2)
-            _missionController.insertSimpleMissionItem(vehicleCoordinate, nextIndex++, true)
-            // worker also sets 3 m here; that's fine, we leave it
+            // (2) Slow takeoff / cable-pull speed.
+            // This is a command-only mission item. No fake nearby waypoint is needed.
+            var takeoffSpeed = Number(_planViewSettings.currentProfileTakeOffSpeed.rawValue) || 1.0
+            _missionController.insertSimpleMissionItemSpeed(takeoffSpeed, nextIndex++, true)
 
-            // (3) D (cable-end) -> worker switches to haul speed here (index 3)
+            // (3) First REAL waypoint: D cable-end point.
+            // This can be far from takeoff now, because speed was already set above.
             _missionController.insertSimpleMissionItem(toRelative(backend.D), nextIndex++, true)
             _setLastItemAltRel(dAltRel)  // ensure correct REL altitude at cable end
 
-            // (4) C (haul altitude), only if meaningfully different from D
+            // (4) Haul speed for the rest of the route.
+            var haulSpeed = Number(_planViewSettings.currentProfileSpeed.rawValue) || takeoffSpeed
+            _missionController.insertSimpleMissionItemSpeed(haulSpeed, nextIndex++, true)
+
+            // (5) C (haul altitude), only if meaningfully different from D
             if (!coordsAlmostEqual(backend.D, backend.C)) {
                 _missionController.insertSimpleMissionItem(toRelative(backend.C), nextIndex++, true)
                 _setLastItemAltRel(haulRel)
@@ -537,13 +558,17 @@ Item {
             // ---- descend-to-drop logic ----
             var useDropAlt = Boolean(_planViewSettings.currentProfileUseDropAlt.rawValue)
             var dropAltRel = Number(_planViewSettings.currentProfileDropAlt.rawValue)
-            if (!isFinite(dropAltRel) || dropAltRel <= 0) dropAltRel = 10.0
-                if (useDropAlt) {
+
+            if (!isFinite(dropAltRel) || dropAltRel <= 0) {
+                dropAltRel = 10.0
+            }
+
+            if (useDropAlt) {
                 var descentAngleDeg = 45.0    // TODO: tune later (shallower -> needs more distance)
                 var descentAngleRad = descentAngleDeg * Math.PI / 180
                 var margin = 5.0              // meters safety margin
 
-                // prevHigh is the last "haul altitude" coordinate before approaching B
+                // prevHigh is the last "haul altitude" coordinate before approaching B.
                 // If C wasn't inserted, we approach from D.
                 var prevHigh = coordsAlmostEqual(backend.D, backend.C) ? backend.D : backend.C
 
@@ -571,17 +596,17 @@ Item {
                     _missionController.insertSimpleMissionItem(toRelative(pCoord), nextIndex++, true)
                     _setLastItemAltRel(haulRel)
 
-                    // B at drop altitude (REL 10m)
+                    // B at drop altitude (REL)
                     _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
                     _setLastItemAltRel(dropAltRel)
-                }else{
+                } else {
                     _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
                     _setLastItemAltRel(haulRel)
                 }
-            }else {
+            } else {
                 // fallback: old behavior (B at haul altitude)
-                    _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
-                    _setLastItemAltRel(haulRel)
+                _missionController.insertSimpleMissionItem(toRelative(coordinate), nextIndex++, true)
+                _setLastItemAltRel(haulRel)
             }
 
             // (6) DO_SET_SERVO (drop) at B
@@ -589,6 +614,7 @@ Item {
 
             // (7) LAND back at A
             _missionController.insertLandItem(vehicleCoordinate, nextIndex++, false)
+
             // bookkeeping
             globals.pointToAdd.lat = coordinate.latitude
             globals.pointToAdd.lon = coordinate.longitude
