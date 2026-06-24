@@ -317,103 +317,57 @@ int MissionController::_nextSequenceNumber(void)
     }
 }
 
-VisualMissionItem* MissionController::insertSimpleMissionItemSpeed(double speed, int visualItemIndex, bool makeCurrentItem)
-{
-    int sequenceNumber = _nextSequenceNumber();
-
-    SimpleMissionItem* newItem = new SimpleMissionItem(_masterController, _flyView, false /* forLoad */);
-
-    newItem->setSequenceNumber(sequenceNumber);
-    newItem->setCommand(MAV_CMD_DO_CHANGE_SPEED);
-
-    // MAV_CMD_DO_CHANGE_SPEED params:
-    // param1: speed type
-    //   0 = airspeed in MAVLink spec, but ArduPilot Copter mainly uses param2
-    //   1 = groundspeed in many ArduPilot examples
-    // param2: speed in m/s
-    // param3: throttle, -1 means no change
-    // param4: absolute/relative, 0 means absolute
-    newItem->missionItem().setParam1(1);
-    newItem->missionItem().setParam2(speed);
-    newItem->missionItem().setParam3(-1);
-    newItem->missionItem().setParam4(0);
-
-    _initVisualItem(newItem);
-
-    if (visualItemIndex == -1) {
-        _visualItems->append(newItem);
-    } else {
-        _visualItems->insert(visualItemIndex, newItem);
-    }
-
-    _recalcAll();
-
-    if (makeCurrentItem) {
-        setCurrentPlanViewSeqNum(newItem->sequenceNumber(), true);
-    }
-
-    _firstItemAdded();
-
-    return newItem;
-}
-
 VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordinate coordinate, MAV_CMD command, int visualItemIndex, bool makeCurrentItem)
 {
     int sequenceNumber = _nextSequenceNumber();
     SimpleMissionItem * newItem = new SimpleMissionItem(_masterController, _flyView, false /* forLoad */);
-    // if (visualItemIndex == 2 /*|| visualItemIndex == 3*/)
-    // {
-    //     newItem->speedSection()->setSpecifyFlightSpeed(true);
-    //     newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toDouble());
-    //     //newItem->al
-    //     newItem->altitude()->setRawValue(3.0);
-    //     newItem->missionItem().setParam1(1);
-    //     // if(visualItemIndex ==3){
-    //     //     newItem->missionItem().setParam1(2);
-    //     // }
-    //     qDebug() << "speed section " << sequenceNumber;
-    // }
+    if (visualItemIndex == 2 /*|| visualItemIndex == 3*/)
+    {
+        newItem->speedSection()->setSpecifyFlightSpeed(true);
+        newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toDouble());
+        //newItem->al
+        newItem->altitude()->setRawValue(3.0);
+        newItem->missionItem().setParam1(1);
+        // if(visualItemIndex ==3){
+        //     newItem->missionItem().setParam1(2);
+        // }
+        qDebug() << "speed section " << sequenceNumber;
+    }
     newItem->setSequenceNumber(sequenceNumber);
     newItem->setCoordinate(coordinate);
     newItem->setCommand(command);
 
-    // if (visualItemIndex == 3)
-    // {
-    //     newItem->speedSection()->setSpecifyFlightSpeed(true);
-    //     newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble());
-    // }
+    if (visualItemIndex == 3)
+    {
+        newItem->speedSection()->setSpecifyFlightSpeed(true);
+        newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble());
+    }
 
     _initVisualItem(newItem);
     if (newItem->specifiesAltitude()) {
         if (!qgcApp()->toolbox()->missionCommandTree()->isLandCommand(command)) {
             double                              prevAltitude;
             QGroundControlQmlGlobal::AltMode    prevAltMode;
-            // if (visualItemIndex == 3)
-            // {
-            //     if (_findPreviousAltitude(visualItemIndex-1, &prevAltitude, &prevAltMode)) {
-            //         newItem->altitude()->setRawValue(prevAltitude);
-            //         if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
-            //             // We are in mixed altitude modes, so copy from previous. Otherwise alt mode will be set from global setting.
-            //             newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
+            if (visualItemIndex == 3)
+            {
+                if (_findPreviousAltitude(visualItemIndex-1, &prevAltitude, &prevAltMode)) {
+                    newItem->altitude()->setRawValue(prevAltitude);
+                    if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
+                        // We are in mixed altitude modes, so copy from previous. Otherwise alt mode will be set from global setting.
+                        newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
 
-            //         }
-            //     }
-            // }
-            // else
-            // {
-            //     if (_findPreviousAltitude(visualItemIndex, &prevAltitude, &prevAltMode)) {
-            //         newItem->altitude()->setRawValue(prevAltitude);
-            //         if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
-            //             // We are in mixed altitude modes, so copy from previous. Otherwise alt mode will be set from global setting.
-            //             newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
+                    }
+                }
+            }
+            else
+            {
+                if (_findPreviousAltitude(visualItemIndex, &prevAltitude, &prevAltMode)) {
+                    newItem->altitude()->setRawValue(prevAltitude);
+                    if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
+                        // We are in mixed altitude modes, so copy from previous. Otherwise alt mode will be set from global setting.
+                        newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
 
-            //         }
-            //     }
-            // }
-            if (_findPreviousAltitude(visualItemIndex, &prevAltitude, &prevAltMode)) {
-                newItem->altitude()->setRawValue(prevAltitude);
-                if (globalAltitudeMode() == QGroundControlQmlGlobal::AltitudeModeMixed) {
-                    newItem->setAltitudeMode(static_cast<QGroundControlQmlGlobal::AltMode>(prevAltMode));
+                    }
                 }
             }
         }

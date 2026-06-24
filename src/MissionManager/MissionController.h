@@ -119,8 +119,6 @@ public:
 
     Q_INVOKABLE void removeVisualItem(int viIndex);
 
-    Q_INVOKABLE VisualMissionItem* insertSimpleMissionItemSpeed(double speed, int visualItemIndex, bool makeCurrentItem);
-
     /// Add a new simple mission item to the list
     ///     @param coordinate: Coordinate for item
     ///     @param visualItemIndex: index to insert at, -1 for end of list
