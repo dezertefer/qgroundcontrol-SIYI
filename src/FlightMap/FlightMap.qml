@@ -179,14 +179,14 @@ Map {
         MouseArea{
             anchors.fill: parent
             onClicked: {
-               if (QGroundControl.settingsManager.flightMapSettings.mapProvider.rawValue === "Bing")
+               if (QGroundControl.settingsManager.flightMapSettings.mapProvider.rawValue === "Google")
                {
                     QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Geoserver"
                     QGroundControl.settingsManager.flightMapSettings.mapType.value=QGroundControl.mapEngineManager.mapTypeList("Geoserver")[0]
                 }
                else
                {
-                   QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Bing"
+                   QGroundControl.settingsManager.flightMapSettings.mapProvider.value="Google"
                    QGroundControl.settingsManager.flightMapSettings.mapType.value="Hybrid"
                }
             }
