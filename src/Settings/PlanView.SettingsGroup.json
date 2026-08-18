@@ -83,7 +83,7 @@
     "type":         "double",
     "default":      20.0,
     "units":        "m",
-    "min":          20.0,
+    "min":          4.0,
     "max":          160.0,
     "decimalPlaces":    1
 },

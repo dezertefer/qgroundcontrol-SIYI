@@ -52,10 +52,12 @@ Item {
     property real telemetryBarHeight: ScreenTools.defaultFontPixelHeight * 2
     property real telemetryBarMargin: _toolsMargin
 
+    QGCPalette { id: qgcPal; colorGroupEnabled: true }
+
     QGCToolInsets {
         id:                     _totalToolInsets
-        leftEdgeTopInset:       toolStrip.leftInset
-        leftEdgeCenterInset:    toolStrip.leftInset
+        leftEdgeTopInset:       Math.max(toolStrip.leftInset, launchSpeedSlider.visible ? launchSpeedSlider.x + launchSpeedSlider.width : 0)
+        leftEdgeCenterInset:    Math.max(toolStrip.leftInset, launchSpeedSlider.visible ? launchSpeedSlider.x + launchSpeedSlider.width : 0)
         leftEdgeBottomInset:    parentToolInsets.leftEdgeBottomInset
         rightEdgeTopInset:      parentToolInsets.rightEdgeTopInset
         rightEdgeCenterInset:   parentToolInsets.rightEdgeCenterInset
@@ -198,6 +200,198 @@ Item {
         onDisplayPreFlightChecklist: mainWindow.showPopupDialogFromComponent(preFlightChecklistPopup)
 
         //property real leftInset: x + width
+    }
+
+    Rectangle {
+        id:                     launchSpeedSlider
+        anchors.left:           parent.left
+        anchors.leftMargin:     toolStrip.leftInset + _toolsMargin
+        anchors.top:            parent.top
+        anchors.topMargin:      _toolsMargin / 3 + parentToolInsets.topEdgeLeftInset
+        anchors.bottom:         parent.bottom
+        anchors.bottomMargin:   telemetryPanel.height + telemetryBarMargin + _toolsMargin
+        width:                  ScreenTools.defaultFontPixelWidth * 8
+        radius:                 ScreenTools.defaultFontPixelWidth / 2
+        color:                  qgcPal.window
+        border.color:           qgcPal.text
+        border.width:           1
+        opacity:                0.92
+        z:                      QGroundControl.zOrderTopMost
+        visible:                !QGroundControl.videoManager.fullScreen &&
+                                _missionController &&
+                                _missionController.aerokontikiGuidedLaunchActive
+
+        property bool _haulPhase:                       _missionController ? _missionController.aerokontikiGuidedLaunchHaulPhase : false
+        property real _profileSpeedMetersPerSecond:     _haulPhase ?
+                                                            QGroundControl.settingsManager.planViewSettings.currentProfileSpeed.rawValue :
+                                                            QGroundControl.settingsManager.planViewSettings.currentProfileTakeOffSpeed.rawValue
+        property real _profileSpeedKph:                 Math.max(0.0, _profileSpeedMetersPerSecond * 3.6)
+        property bool _profileAllowsSpeedBoost:         !_haulPhase && _profileSpeedKph <= 3.01
+        property real _minSpeedKph:                     1
+        property real _maxSpeedKph:                     Math.max(_minSpeedKph, Math.round(_profileSpeedKph * (_profileAllowsSpeedBoost ? 1.5 : 1.0) * 10) / 10)
+        property real _speedStepKph:                    _maxSpeedKph <= 5 ? 0.5 : 1
+        property int  _speedStepCount:                  Math.max(0, Math.ceil((_maxSpeedKph - _minSpeedKph) / _speedStepKph))
+        property int  _maxSpeedLabelCount:              10
+        property int  _speedLabelCount:                 Math.min(_speedStepCount + 1, _maxSpeedLabelCount)
+
+        function _speedForIndex(index) {
+            return Math.min(_minSpeedKph + Math.max(0, index) * _speedStepKph, _maxSpeedKph)
+        }
+
+        function _stepIndexForLabel(labelIndex) {
+            if (_speedLabelCount <= 1 || _speedStepCount === 0) {
+                return 0
+            }
+            return Math.round((labelIndex / (_speedLabelCount - 1)) * _speedStepCount)
+        }
+
+        function _speedForLabel(labelIndex) {
+            return _speedForIndex(_stepIndexForLabel(labelIndex))
+        }
+
+        function _currentSpeedKph() {
+            return _missionController ?
+                        Math.max(_minSpeedKph, Math.min(_maxSpeedKph, _missionController.aerokontikiGuidedLaunchSpeed * 3.6)) :
+                        _minSpeedKph
+        }
+
+        function _formatSpeed(value) {
+            return (_speedStepKph < 1 || Math.abs(value - Math.round(value)) > 0.01) ? value.toFixed(1) : value.toFixed(0)
+        }
+
+        function _labelY(labelIndex, labelHeight) {
+            if (_speedStepCount === 0) {
+                return Math.max(0, (speedSteps.height - labelHeight) / 2)
+            }
+            var stepIndex = _stepIndexForLabel(labelIndex)
+            var rawY = speedSteps.height - ((stepIndex / _speedStepCount) * speedSteps.height) - labelHeight / 2
+            return Math.max(0, Math.min(speedSteps.height - labelHeight, rawY))
+        }
+
+        function _syncFromController() {
+            if (_missionController) {
+                speedSlider.value = Math.max(_minSpeedKph, Math.min(_maxSpeedKph, _missionController.aerokontikiGuidedLaunchSpeed * 3.6))
+            }
+        }
+
+        onVisibleChanged: {
+            if (visible) {
+                _syncFromController()
+            }
+        }
+
+        Connections {
+            target: _missionController
+            function onAerokontikiGuidedLaunchSpeedChanged() {
+                if (launchSpeedSlider.visible) {
+                    launchSpeedSlider._syncFromController()
+                }
+            }
+            function onAerokontikiGuidedLaunchHaulPhaseChanged() {
+                if (launchSpeedSlider.visible) {
+                    launchSpeedSlider._syncFromController()
+                }
+            }
+        }
+
+        Column {
+            anchors.fill:       parent
+            anchors.margins:    ScreenTools.defaultFontPixelWidth * 0.6
+            spacing:            ScreenTools.defaultFontPixelHeight * 0.25
+
+            QGCLabel {
+                anchors.left:           parent.left
+                anchors.right:          parent.right
+                horizontalAlignment:    Text.AlignHCenter
+                wrapMode:               Text.WordWrap
+                text:                   launchSpeedSlider._haulPhase ? qsTr("Haul Speed") : qsTr("Launch Speed")
+                color:                  qgcPal.text
+                font.pointSize:         ScreenTools.smallFontPointSize
+            }
+
+            QGCLabel {
+                anchors.left:           parent.left
+                anchors.right:          parent.right
+                horizontalAlignment:    Text.AlignHCenter
+                text:                   launchSpeedSlider._formatSpeed(launchSpeedSlider._currentSpeedKph()) + qsTr(" km/h")
+                color:                  qgcPal.text
+                font.bold:              true
+            }
+
+            Item {
+                anchors.left:           parent.left
+                anchors.right:          parent.right
+                height:                 parent.height - y
+
+                QGCSlider {
+                    id:                     speedSlider
+                    anchors.left:           parent.left
+                    anchors.right:          speedSteps.left
+                    anchors.rightMargin:    ScreenTools.defaultFontPixelWidth * 0.4
+                    anchors.top:            parent.top
+                    anchors.bottom:         parent.bottom
+                    orientation:            Qt.Vertical
+                    minimumValue:           launchSpeedSlider._minSpeedKph
+                    maximumValue:           launchSpeedSlider._maxSpeedKph
+                    stepSize:               launchSpeedSlider._speedStepKph
+                    tickmarksEnabled:       true
+                    updateValueWhileDragging: true
+                    displayValue:           false
+                    rotation:               180
+
+                    transform: Rotation {
+                        origin.x:   speedSlider.width  / 2
+                        origin.y:   speedSlider.height / 2
+                        angle:      180
+                    }
+
+                    onValueChanged: {
+                        if (launchSpeedSlider.visible && _missionController) {
+                            var speedKph = Math.max(launchSpeedSlider._minSpeedKph, Math.min(launchSpeedSlider._maxSpeedKph, value))
+                            console.info("AerokontikiSpeed qml-slider requestedKph=" + speedKph +
+                                         " requestedMps=" + (speedKph / 3.6))
+                            _missionController.setAerokontikiGuidedLaunchSpeed(speedKph / 3.6)
+                        }
+                    }
+                }
+
+                Item {
+                    id:                     speedSteps
+                    anchors.right:          parent.right
+                    anchors.top:            parent.top
+                    anchors.bottom:         parent.bottom
+                    width:                  ScreenTools.defaultFontPixelWidth * 2.5
+
+                    Repeater {
+                        model: launchSpeedSlider._speedLabelCount
+
+                        QGCLabel {
+                            property real labelValue: launchSpeedSlider._speedForLabel(modelData)
+                            x:                      0
+                            y:                      launchSpeedSlider._labelY(modelData, height)
+                            width:                  speedSteps.width
+                            horizontalAlignment:    Text.AlignHCenter
+                            text:                   launchSpeedSlider._formatSpeed(labelValue)
+                            color:                  qgcPal.text
+                            opacity:                1.0
+                            font.pointSize:         ScreenTools.smallFontPointSize * 1.5
+                        }
+                    }
+
+                    Repeater {
+                        model: launchSpeedSlider._speedLabelCount
+
+                        MouseArea {
+                            x:          0
+                            y:          launchSpeedSlider._labelY(modelData, height)
+                            width:      speedSteps.width
+                            height:     Math.max(ScreenTools.defaultFontPixelHeight, speedSteps.height / launchSpeedSlider._speedLabelCount)
+                            onClicked:  speedSlider.value = launchSpeedSlider._speedForLabel(modelData)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     FlyViewAirspaceIndicator {

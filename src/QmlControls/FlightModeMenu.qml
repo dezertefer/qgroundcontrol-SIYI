@@ -17,7 +17,7 @@ import QGroundControl.ScreenTools   1.0
 // Label control whichs pop up a flight mode change menu when clicked
 QGCLabel {
     id:     _root
-    text:   currentVehicle ? currentVehicle.flightMode : qsTr("N/A", "No data to display")
+    text:   currentVehicle ? displayFlightMode(currentVehicle.flightMode) : qsTr("N/A", "No data to display")
 
     property var    currentVehicle:         QGroundControl.multiVehicleManager.activeVehicle
     property real   mouseAreaLeftMargin:    0
@@ -30,12 +30,47 @@ QGCLabel {
         id: flightModeMenuItemComponent
 
         MenuItem {
+            property string targetFlightMode
             enabled: true
-            onTriggered: currentVehicle.flightMode = text
+            onTriggered: currentVehicle.flightMode = targetFlightMode
         }
     }
 
     property var flightModesMenuItems: []
+
+    function _modeMatches(mode, targetMode, fallbackMode) {
+        return mode &&
+               ((targetMode && mode.toLowerCase() === targetMode.toLowerCase()) ||
+                (fallbackMode && mode.toLowerCase() === fallbackMode.toLowerCase()))
+    }
+
+    function displayFlightMode(mode) {
+        if (!currentVehicle) {
+            return qsTr("N/A", "No data to display")
+        }
+        if (_modeMatches(mode, currentVehicle.takeControlFlightMode, "Loiter")) {
+            return qsTr("Manual")
+        }
+        if (_modeMatches(mode, currentVehicle.gotoFlightMode, "Guided") ||
+            _modeMatches(mode, currentVehicle.missionFlightMode, "Auto")) {
+            return qsTr("Auto")
+        }
+        if (_modeMatches(mode, currentVehicle.rtlFlightMode, "RTL") ||
+            _modeMatches(mode, currentVehicle.smartRTLFlightMode, "Smart RTL")) {
+            return qsTr("RTL")
+        }
+        return mode
+    }
+
+    function _targetMode(preferredMode, fallbackMode) {
+        return preferredMode && preferredMode.length ? preferredMode : fallbackMode
+    }
+
+    function _addFlightModeItem(label, targetMode) {
+        var menuItem = flightModeMenuItemComponent.createObject(null, { "text": label, "targetFlightMode": targetMode })
+        flightModesMenuItems.push(menuItem)
+        flightModesMenu.insertItem(flightModesMenuItems.length - 1, menuItem)
+    }
 
     function updateFlightModesMenu() {
         if (currentVehicle && currentVehicle.flightModeSetAvailable) {
@@ -45,12 +80,9 @@ QGCLabel {
                 flightModesMenu.removeItem(flightModesMenuItems[i])
             }
             flightModesMenuItems.length = 0
-            // Add new items
-            for (i = 0; i < currentVehicle.flightModes.length; i++) {
-                var menuItem = flightModeMenuItemComponent.createObject(null, { "text": currentVehicle.flightModes[i] })
-                flightModesMenuItems.push(menuItem)
-                flightModesMenu.insertItem(i, menuItem)
-            }
+            _addFlightModeItem(qsTr("Manual"), _targetMode(currentVehicle.takeControlFlightMode, "Loiter"))
+            _addFlightModeItem(qsTr("Auto"),   _targetMode(currentVehicle.gotoFlightMode, "Guided"))
+            _addFlightModeItem(qsTr("RTL"),    _targetMode(currentVehicle.rtlFlightMode, "RTL"))
         }
     }
 

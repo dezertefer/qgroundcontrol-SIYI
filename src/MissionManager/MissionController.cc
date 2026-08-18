@@ -21,7 +21,6 @@
 #include "StructureScanComplexItem.h"
 #include "CorridorScanComplexItem.h"
 #include "JsonHelper.h"
-#include "ParameterManager.h"
 #include "QGroundControlQmlGlobal.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
@@ -32,6 +31,11 @@
 #include "QGCCorePlugin.h"
 #include "TakeoffMissionItem.h"
 #include "PlanViewSettings.h"
+#include "SpeedSection.h"
+
+#include <QCryptographicHash>
+#include <QDataStream>
+#include <QtMath>
 
 #define UPDATE_TIMEOUT 5000 ///< How often we check for bounding box changes
 
@@ -66,8 +70,12 @@ MissionController::MissionController(PlanMasterController* masterController, QOb
     _resetMissionFlightStatus();
 
     _updateTimer.setSingleShot(true);
+    _aerokontikiLaunchTimer.setInterval(500);
+    _aerokontikiFlightModeTimer.setInterval(250);
 
     connect(&_updateTimer,                                  &QTimer::timeout,                           this, &MissionController::_updateTimeout);
+    connect(&_aerokontikiLaunchTimer,                       &QTimer::timeout,                           this, &MissionController::_aerokontikiGuidedLaunchTick);
+    connect(&_aerokontikiFlightModeTimer,                   &QTimer::timeout,                           this, &MissionController::_aerokontikiFlightModeTick);
     connect(_planViewSettings->takeoffItemNotRequired(),    &Fact::rawValueChanged,                     this, &MissionController::_takeoffItemNotRequiredChanged);
     connect(this,                                           &MissionController::missionDistanceChanged, this, &MissionController::recalcTerrainProfile);
 
@@ -136,6 +144,20 @@ void MissionController::start(bool flyView)
 
     PlanElementController::start(flyView);
     _init();
+
+    if (_masterController->aerokontikiControl()) {
+        qCInfo(MissionControllerLog) << "AerokontikiControl owner-enabled"
+                                    << "controller" << this
+                                    << "masterController" << _masterController
+                                    << "flyView" << _flyView;
+        _aerokontikiFlightModeTimer.start();
+    } else {
+        qCInfo(MissionControllerLog) << "AerokontikiControl observer-only"
+                                    << "controller" << this
+                                    << "masterController" << _masterController
+                                    << "flyView" << _flyView;
+        _aerokontikiFlightModeTimer.stop();
+    }
 }
 
 void MissionController::_init(void)
@@ -149,6 +171,10 @@ void MissionController::_init(void)
 void MissionController::_newMissionItemsAvailableFromVehicle(bool removeAllRequested)
 {
     qCDebug(MissionControllerLog) << "_newMissionItemsAvailableFromVehicle flyView:count" << _flyView << _missionManager->missionItems().count();
+
+    if (removeAllRequested) {
+        _stopAerokontikiGuidedLaunch();
+    }
 
     // Fly view always reloads on _loadComplete
     // Plan view only reloads if:
@@ -251,6 +277,1033 @@ void MissionController::sendToVehicle(void)
     setDirty(false);
 }
 
+double MissionController::_missionItemRelativeAltitude(SimpleMissionItem* simpleItem) const
+{
+    if (!simpleItem || !simpleItem->specifiesAltitude() || simpleItem->altitude()->rawValue().isNull()) {
+        return qQNaN();
+    }
+
+    const double altitude = simpleItem->altitude()->rawValue().toDouble();
+    return qIsNaN(altitude) ? qQNaN() : altitude;
+}
+
+bool MissionController::aerokontikiGuidedLaunchActive() const
+{
+    return _aerokontikiLaunchState != AerokontikiLaunchIdle;
+}
+
+bool MissionController::aerokontikiGuidedLaunchPaused() const
+{
+    return _aerokontikiLaunchPaused;
+}
+
+bool MissionController::aerokontikiGuidedLaunchAvailable() const
+{
+    return _aerokontikiLaunchPlan().valid;
+}
+
+double MissionController::aerokontikiGuidedLaunchSpeed() const
+{
+    const double profileSpeed = _aerokontikiHaulPhase ?
+        _planViewSettings->currentProfileSpeed()->rawValue().toDouble() :
+        _planViewSettings->currentProfileTakeOffSpeed()->rawValue().toDouble();
+    return qIsNaN(_aerokontikiLaunchSpeed) ?
+        _clampedAerokontikiGuidedLaunchSpeed(profileSpeed) :
+        _aerokontikiLaunchSpeed;
+}
+
+void MissionController::setAerokontikiGuidedLaunchSpeed(double speedMetersPerSecond)
+{
+    const double profileSpeed = _aerokontikiHaulPhase ?
+        _planViewSettings->currentProfileSpeed()->rawValue().toDouble() :
+        _planViewSettings->currentProfileTakeOffSpeed()->rawValue().toDouble();
+    const double clampedSpeed = _clampedAerokontikiGuidedLaunchSpeed(speedMetersPerSecond);
+    qCInfo(MissionControllerLog) << "AerokontikiSpeed slider-request"
+                                << "controller" << this
+                                << "requestedMps" << speedMetersPerSecond
+                                << "requestedKph" << speedMetersPerSecond * 3.6
+                                << "profileMps" << profileSpeed
+                                << "profileKph" << profileSpeed * 3.6
+                                << "previousMps" << _aerokontikiLaunchSpeed
+                                << "clampedMps" << clampedSpeed
+                                << "clampedKph" << clampedSpeed * 3.6
+                                << "haulPhase" << _aerokontikiHaulPhase
+                                << "state" << static_cast<int>(_aerokontikiLaunchState);
+    if (qIsNaN(clampedSpeed)) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed slider-rejected"
+                                       << "controller" << this
+                                       << "reason invalid-clamped-speed";
+        return;
+    }
+
+    if (!qIsNaN(_aerokontikiLaunchSpeed) && qFuzzyCompare(_aerokontikiLaunchSpeed + 1.0, clampedSpeed + 1.0)) {
+        qCInfo(MissionControllerLog) << "AerokontikiSpeed slider-unchanged"
+                                    << "controller" << this
+                                    << "storedMps" << _aerokontikiLaunchSpeed
+                                    << "storedKph" << _aerokontikiLaunchSpeed * 3.6;
+        return;
+    }
+
+    _aerokontikiLaunchSpeed = clampedSpeed;
+    qCInfo(MissionControllerLog) << "AerokontikiSpeed slider-stored"
+                                << "controller" << this
+                                << "storedMps" << _aerokontikiLaunchSpeed
+                                << "storedKph" << _aerokontikiLaunchSpeed * 3.6;
+    emit aerokontikiGuidedLaunchSpeedChanged();
+}
+
+bool MissionController::_aerokontikiModeIsManual(Vehicle* vehicle, const QString& flightMode) const
+{
+    if (!vehicle || flightMode.isEmpty()) {
+        return false;
+    }
+
+    return flightMode.compare(vehicle->takeControlFlightMode(), Qt::CaseInsensitive) == 0 ||
+           flightMode.compare(QStringLiteral("Loiter"), Qt::CaseInsensitive) == 0;
+}
+
+bool MissionController::_aerokontikiModeIsAutoControl(Vehicle* vehicle, const QString& flightMode) const
+{
+    if (!vehicle || flightMode.isEmpty()) {
+        return false;
+    }
+
+    return flightMode.compare(vehicle->gotoFlightMode(), Qt::CaseInsensitive) == 0 ||
+           flightMode.compare(QStringLiteral("Guided"), Qt::CaseInsensitive) == 0;
+}
+
+bool MissionController::_aerokontikiModeIsRtl(Vehicle* vehicle, const QString& flightMode) const
+{
+    if (!vehicle || flightMode.isEmpty()) {
+        return false;
+    }
+
+    return flightMode.compare(vehicle->rtlFlightMode(), Qt::CaseInsensitive) == 0 ||
+           flightMode.compare(vehicle->smartRTLFlightMode(), Qt::CaseInsensitive) == 0 ||
+           flightMode.compare(QStringLiteral("RTL"), Qt::CaseInsensitive) == 0 ||
+           flightMode.compare(QStringLiteral("Smart RTL"), Qt::CaseInsensitive) == 0;
+}
+
+void MissionController::_pauseAerokontikiGuidedLaunch(void)
+{
+    if (_aerokontikiLaunchState == AerokontikiLaunchIdle || !_aerokontikiLaunchVehicle || _aerokontikiLaunchPaused) {
+        return;
+    }
+
+    _aerokontikiLaunchPaused = true;
+    _aerokontikiProgressElapsed.restart();
+    emit aerokontikiGuidedLaunchPausedChanged();
+}
+
+void MissionController::_resumeAerokontikiGuidedLaunch(void)
+{
+    if (_aerokontikiLaunchState == AerokontikiLaunchIdle || !_aerokontikiLaunchVehicle || !_aerokontikiLaunchPaused) {
+        return;
+    }
+
+    _aerokontikiLaunchPaused = false;
+    _aerokontikiLegStartCoordinate = _aerokontikiLaunchVehicle->coordinate();
+    _aerokontikiProgressElapsed.restart();
+    emit aerokontikiGuidedLaunchPausedChanged();
+    _aerokontikiLaunchElapsed.restart();
+}
+
+bool MissionController::toggleAerokontikiGuidedLaunchPause(void)
+{
+    if (_aerokontikiLaunchState == AerokontikiLaunchIdle || !_aerokontikiLaunchVehicle) {
+        return false;
+    }
+
+    if (!_aerokontikiLaunchPaused) {
+        _pauseAerokontikiGuidedLaunch();
+    } else {
+        if (!_aerokontikiModeIsAutoControl(_aerokontikiLaunchVehicle, _aerokontikiLaunchVehicle->flightMode())) {
+            _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided launch cancelled: vehicle is in %1 mode.").arg(_aerokontikiLaunchVehicle->flightMode()));
+            return true;
+        }
+        _resumeAerokontikiGuidedLaunch();
+    }
+
+    return true;
+}
+
+void MissionController::_setAerokontikiHaulPhase(bool haulPhase)
+{
+    if (_aerokontikiHaulPhase == haulPhase) {
+        return;
+    }
+
+    _aerokontikiHaulPhase = haulPhase;
+    _aerokontikiLaunchSpeed = qQNaN();
+    emit aerokontikiGuidedLaunchHaulPhaseChanged();
+    emit aerokontikiGuidedLaunchSpeedChanged();
+}
+
+double MissionController::_clampedAerokontikiGuidedLaunchSpeed(double speedMetersPerSecond) const
+{
+    const double profileSpeed = _aerokontikiHaulPhase ?
+        _planViewSettings->currentProfileSpeed()->rawValue().toDouble() :
+        _planViewSettings->currentProfileTakeOffSpeed()->rawValue().toDouble();
+    if (qIsNaN(profileSpeed) || profileSpeed <= 0) {
+        return qQNaN();
+    }
+
+    static const double slowProfileThresholdMetersPerSecond = 3.0 / 3.6;
+    const double maxSpeed = !_aerokontikiHaulPhase && profileSpeed <= slowProfileThresholdMetersPerSecond + 0.001 ?
+        profileSpeed * 1.5 :
+        profileSpeed;
+
+    return qBound(0.0, speedMetersPerSecond, maxSpeed);
+}
+
+MissionController::AerokontikiLaunchPlan_t MissionController::_aerokontikiLaunchPlan(void) const
+{
+    AerokontikiLaunchPlan_t launchPlan;
+
+    if (!_visualItems || _visualItems->count() < 6) {
+        return launchPlan;
+    }
+
+    bool foundTakeoff = false;
+    bool foundServo = false;
+    bool foundLandOrReturnAfterServo = false;
+    double maxWaypointAltitude = qQNaN();
+    int maxWaypointAltitudeIndex = -1;
+    QByteArray fingerprintData;
+    QDataStream fingerprintStream(&fingerprintData, QIODevice::WriteOnly);
+    fingerprintStream.setVersion(QDataStream::Qt_5_12);
+
+    for (int i = 1; i < _visualItems->count(); i++) {
+        SimpleMissionItem* simpleItem = qobject_cast<SimpleMissionItem*>(_visualItems->get(i));
+        if (!simpleItem) {
+            continue;
+        }
+
+        const MAV_CMD command = simpleItem->mavCommand();
+        const MissionItem& missionItem = simpleItem->missionItem();
+        const bool specifiesFlightSpeed = simpleItem->speedSection()->specifyFlightSpeed();
+        const double specifiedFlightSpeed = simpleItem->speedSection()->specifiedFlightSpeed();
+        fingerprintStream << simpleItem->sequenceNumber()
+                          << static_cast<int>(command)
+                          << static_cast<int>(missionItem.frame())
+                          << missionItem.param1()
+                          << missionItem.param2()
+                          << missionItem.param3()
+                          << missionItem.param4()
+                          << missionItem.param5()
+                          << missionItem.param6()
+                          << missionItem.param7()
+                          << specifiesFlightSpeed
+                          << specifiedFlightSpeed;
+
+        if (TakeoffMissionItem::isTakeoffCommand(command)) {
+            foundTakeoff = true;
+            launchPlan.takeoffAltitude = _missionItemRelativeAltitude(simpleItem);
+        } else if (command == MAV_CMD_DO_SET_SERVO) {
+            foundServo = true;
+            launchPlan.servoParam1 = missionItem.param1();
+            launchPlan.servoParam2 = missionItem.param2();
+            launchPlan.servoParam3 = missionItem.param3();
+            launchPlan.servoParam4 = missionItem.param4();
+            launchPlan.servoParam5 = missionItem.param5();
+            launchPlan.servoParam6 = missionItem.param6();
+            launchPlan.servoParam7 = missionItem.param7();
+        } else if (foundServo &&
+                   (command == MAV_CMD_NAV_RETURN_TO_LAUNCH ||
+                    command == MAV_CMD_NAV_LAND ||
+                    command == MAV_CMD_NAV_VTOL_LAND)) {
+            foundLandOrReturnAfterServo = true;
+        } else if (!foundServo && command == MAV_CMD_DO_CHANGE_SPEED && !launchPlan.waypoints.isEmpty()) {
+            if (launchPlan.haulTransitionIndex == -1) {
+                launchPlan.haulTransitionIndex = launchPlan.waypoints.count() - 1;
+            }
+        } else if (!foundServo && command == MAV_CMD_NAV_WAYPOINT) {
+            const double waypointAltitude = _missionItemRelativeAltitude(simpleItem);
+            if (!qIsNaN(waypointAltitude) && simpleItem->coordinate().isValid()) {
+                AerokontikiGuidedWaypoint_t waypoint;
+                waypoint.coordinate = simpleItem->coordinate();
+                waypoint.altitudeRelative = waypointAltitude;
+                waypoint.sequenceNumber = simpleItem->sequenceNumber();
+                launchPlan.waypoints.append(waypoint);
+                if (qIsNaN(maxWaypointAltitude) || waypointAltitude > maxWaypointAltitude) {
+                    maxWaypointAltitude = waypointAltitude;
+                    maxWaypointAltitudeIndex = launchPlan.waypoints.count() - 1;
+                }
+                if (specifiesFlightSpeed && launchPlan.haulTransitionIndex == -1) {
+                    launchPlan.haulTransitionIndex = launchPlan.waypoints.count() - 1;
+                }
+            }
+        }
+    }
+
+    if (launchPlan.haulTransitionIndex == -1) {
+        launchPlan.haulTransitionIndex = maxWaypointAltitudeIndex;
+    }
+
+    if (!foundTakeoff ||
+        !foundServo ||
+        !foundLandOrReturnAfterServo ||
+        launchPlan.waypoints.count() < 2 ||
+        launchPlan.haulTransitionIndex == -1 ||
+        qIsNaN(maxWaypointAltitude) ||
+        qIsNaN(launchPlan.takeoffAltitude)) {
+        return launchPlan;
+    }
+
+    launchPlan.missionAltitude = maxWaypointAltitude;
+    launchPlan.fingerprint = QCryptographicHash::hash(fingerprintData, QCryptographicHash::Sha256);
+    launchPlan.valid = launchPlan.missionAltitude > launchPlan.takeoffAltitude + 1.0;
+
+    return launchPlan;
+}
+
+void MissionController::_sendAerokontikiGuidedHold(void)
+{
+    if (!_masterController->aerokontikiControl()) {
+        qCCritical(MissionControllerLog) << "AerokontikiControl command-blocked"
+                                        << "controller" << this
+                                        << "command guided-hold"
+                                        << "reason observer-controller";
+        return;
+    }
+
+    if (!_aerokontikiLaunchVehicle || !_aerokontikiLaunchVehicle->coordinate().isValid()) {
+        return;
+    }
+
+    const double altitudeRelative = _aerokontikiLaunchVehicle->altitudeRelative()->rawValue().toDouble();
+    if (qIsNaN(altitudeRelative)) {
+        return;
+    }
+
+    const QGeoCoordinate holdCoordinate = _aerokontikiLaunchVehicle->coordinate();
+    _aerokontikiLaunchVehicle->guidedModeGotoLocation(holdCoordinate);
+}
+
+void MissionController::_sendAerokontikiGuidedVelocityTarget(const QGeoCoordinate& coordinate, double altitudeRelative, double speedMetersPerSecond)
+{
+    if (!_masterController->aerokontikiControl()) {
+        qCCritical(MissionControllerLog) << "AerokontikiControl command-blocked"
+                                        << "controller" << this
+                                        << "command guided-velocity-target"
+                                        << "reason observer-controller";
+        return;
+    }
+
+    if (!_aerokontikiLaunchVehicle || !coordinate.isValid() || qIsNaN(altitudeRelative) || qIsNaN(speedMetersPerSecond) || speedMetersPerSecond <= 0) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason invalid-input"
+                                       << "hasVehicle" << static_cast<bool>(_aerokontikiLaunchVehicle)
+                                       << "coordinateValid" << coordinate.isValid()
+                                       << "altitude" << altitudeRelative
+                                       << "speedMps" << speedMetersPerSecond;
+        return;
+    }
+
+    if (!_aerokontikiModeIsAutoControl(_aerokontikiLaunchVehicle, _aerokontikiLaunchVehicle->flightMode())) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason not-guided"
+                                       << "flightMode" << _aerokontikiLaunchVehicle->flightMode()
+                                       << "speedMps" << speedMetersPerSecond
+                                       << "speedKph" << speedMetersPerSecond * 3.6;
+        return;
+    }
+
+    const QGeoCoordinate vehicleCoordinate = _aerokontikiLaunchVehicle->coordinate();
+    if (!vehicleCoordinate.isValid()) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason invalid-vehicle-coordinate";
+        return;
+    }
+
+    const double distanceToTarget = vehicleCoordinate.distanceTo(coordinate);
+    if (qIsNaN(distanceToTarget) || distanceToTarget < 0.1) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason target-too-close"
+                                       << "distanceMeters" << distanceToTarget;
+        return;
+    }
+
+    const double altitudeRelativeCurrent = _aerokontikiLaunchVehicle->altitudeRelative()->rawValue().toDouble();
+    if (qIsNaN(altitudeRelativeCurrent)) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason invalid-relative-altitude";
+        return;
+    }
+
+    static const double maxVerticalSpeed = 1.5;
+    const double altitudeDelta = altitudeRelative - altitudeRelativeCurrent;
+    double horizontalSpeed = speedMetersPerSecond;
+    if (qAbs(altitudeDelta) > 1.0) {
+        const double minimumVerticalTime = qAbs(altitudeDelta) / maxVerticalSpeed;
+        if (minimumVerticalTime > 0.1) {
+            horizontalSpeed = qMin(horizontalSpeed, qMax(0.25, distanceToTarget / minimumVerticalTime));
+        }
+    }
+
+    const double bearingRadians = qDegreesToRadians(vehicleCoordinate.azimuthTo(coordinate));
+    const double northVelocity = horizontalSpeed * qCos(bearingRadians);
+    const double eastVelocity = horizontalSpeed * qSin(bearingRadians);
+
+    double downVelocity = 0.0;
+    const double secondsToTarget = distanceToTarget / horizontalSpeed;
+    if (secondsToTarget > 0.1) {
+        const double climbVelocity = altitudeDelta / secondsToTarget;
+        downVelocity = -qBound(-maxVerticalSpeed, climbVelocity, maxVerticalSpeed);
+    }
+
+    auto weakLink = _aerokontikiLaunchVehicle->vehicleLinkManager()->primaryLink();
+    if (weakLink.expired()) {
+        qCWarning(MissionControllerLog) << "AerokontikiSpeed target-skipped"
+                                       << "controller" << this
+                                       << "reason no-primary-link";
+        return;
+    }
+
+    auto sharedLink = weakLink.lock();
+    qCInfo(MissionControllerLog) << "AerokontikiSpeed target-send"
+                                << "controller" << this
+                                << "vehicleId" << _aerokontikiLaunchVehicle->id()
+                                << "state" << static_cast<int>(_aerokontikiLaunchState)
+                                << "storedMps" << _aerokontikiLaunchSpeed
+                                << "storedKph" << _aerokontikiLaunchSpeed * 3.6
+                                << "argumentMps" << speedMetersPerSecond
+                                << "argumentKph" << speedMetersPerSecond * 3.6
+                                << "horizontalMps" << horizontalSpeed
+                                << "northMps" << northVelocity
+                                << "eastMps" << eastVelocity
+                                << "downMps" << downVelocity
+                                << "yawDegrees" << qRadiansToDegrees(bearingRadians)
+                                << "distanceMeters" << distanceToTarget
+                                << "flightMode" << _aerokontikiLaunchVehicle->flightMode();
+
+    mavlink_message_t message;
+    mavlink_msg_set_position_target_global_int_pack_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
+                                                         qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                                                         sharedLink->mavlinkChannel(),
+                                                         &message,
+                                                         0,                                                     // time_boot_ms unused by ArduPilot here
+                                                         _aerokontikiLaunchVehicle->id(),
+                                                          _aerokontikiLaunchVehicle->defaultComponentId(),
+                                                          MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                                                          POSITION_TARGET_TYPEMASK_X_IGNORE |
+                                                          POSITION_TARGET_TYPEMASK_Y_IGNORE |
+                                                          POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                                                          POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                                                          POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                                                          POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE,
+                                                         static_cast<int32_t>(qRound64(coordinate.latitude() * 1e7)),
+                                                         static_cast<int32_t>(qRound64(coordinate.longitude() * 1e7)),
+                                                         static_cast<float>(altitudeRelative),
+                                                         static_cast<float>(northVelocity),
+                                                         static_cast<float>(eastVelocity),
+                                                         static_cast<float>(downVelocity),
+                                                         0.0f,
+                                                         0.0f,
+                                                         0.0f,
+                                                         static_cast<float>(bearingRadians),
+                                                         0.0f);
+    _aerokontikiLaunchVehicle->setGuidedMode(true);
+    _aerokontikiLaunchVehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+}
+
+bool MissionController::_aerokontikiWaypointReached(const AerokontikiGuidedWaypoint_t& waypoint,
+                                                     double distanceToTarget,
+                                                     double altitudeRelative) const
+{
+    if (!_aerokontikiLaunchVehicle || qIsNaN(distanceToTarget) || qIsNaN(altitudeRelative)) {
+        return false;
+    }
+
+    const bool finalWaypoint = _aerokontikiWaypointIndex == _aerokontikiActivePlan.waypoints.count() - 1;
+    const double horizontalTolerance = finalWaypoint ? 5.0 : 8.0;
+    const double altitudeTolerance = 3.0;
+    if (qAbs(altitudeRelative - waypoint.altitudeRelative) > altitudeTolerance) {
+        return false;
+    }
+
+    if (distanceToTarget <= horizontalTolerance) {
+        return true;
+    }
+
+    const QGeoCoordinate vehicleCoordinate = _aerokontikiLaunchVehicle->coordinate();
+    if (!_aerokontikiLegStartCoordinate.isValid() || !vehicleCoordinate.isValid()) {
+        return false;
+    }
+
+    const double legLength = _aerokontikiLegStartCoordinate.distanceTo(waypoint.coordinate);
+    const double startToVehicle = _aerokontikiLegStartCoordinate.distanceTo(vehicleCoordinate);
+    if (qIsNaN(legLength) || qIsNaN(startToVehicle) || legLength < 1.0) {
+        return false;
+    }
+
+    const double bearingDifference = qDegreesToRadians(
+        _aerokontikiLegStartCoordinate.azimuthTo(vehicleCoordinate) -
+        _aerokontikiLegStartCoordinate.azimuthTo(waypoint.coordinate));
+    const double alongTrack = startToVehicle * qCos(bearingDifference);
+    const double crossTrack = qAbs(startToVehicle * qSin(bearingDifference));
+    const double passCorridor = qMax(horizontalTolerance, aerokontikiGuidedLaunchSpeed() * 1.5);
+    return alongTrack >= legLength && crossTrack <= passCorridor;
+}
+
+bool MissionController::_sendAerokontikiServoCommand(void)
+{
+    if (!_masterController->aerokontikiControl() || !_aerokontikiLaunchVehicle || _aerokontikiServoCommandSent) {
+        return false;
+    }
+
+    auto weakLink = _aerokontikiLaunchVehicle->vehicleLinkManager()->primaryLink();
+    if (weakLink.expired()) {
+        qCWarning(MissionControllerLog) << "Aerokontiki guided servo release deferred: no primary link";
+        return false;
+    }
+
+    auto sharedLink = weakLink.lock();
+    mavlink_command_long_t command = {};
+    command.target_system = _aerokontikiLaunchVehicle->id();
+    command.target_component = _aerokontikiLaunchVehicle->defaultComponentId();
+    command.command = MAV_CMD_DO_SET_SERVO;
+    command.param1 = static_cast<float>(_aerokontikiActivePlan.servoParam1);
+    command.param2 = static_cast<float>(_aerokontikiActivePlan.servoParam2);
+    command.param3 = static_cast<float>(_aerokontikiActivePlan.servoParam3);
+    command.param4 = static_cast<float>(_aerokontikiActivePlan.servoParam4);
+    command.param5 = static_cast<float>(_aerokontikiActivePlan.servoParam5);
+    command.param6 = static_cast<float>(_aerokontikiActivePlan.servoParam6);
+    command.param7 = static_cast<float>(_aerokontikiActivePlan.servoParam7);
+
+    mavlink_message_t message;
+    mavlink_msg_command_long_encode_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
+                                         qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                                         sharedLink->mavlinkChannel(),
+                                         &message,
+                                         &command);
+    _aerokontikiLaunchVehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    _aerokontikiServoCommandSent = true;
+    qCInfo(MissionControllerLog) << "Aerokontiki guided servo release sent without acknowledgement"
+                                << "vehicleId" << _aerokontikiLaunchVehicle->id()
+                                << "channel" << _aerokontikiActivePlan.servoParam1
+                                << "pwm" << _aerokontikiActivePlan.servoParam2;
+    return true;
+}
+
+void MissionController::_finishAerokontikiGuidedMission(const QString& warning)
+{
+    Vehicle* vehicle = _aerokontikiLaunchVehicle;
+    _aerokontikiLaunchCompleted = true;
+    if (vehicle && !_aerokontikiModeIsRtl(vehicle, vehicle->flightMode())) {
+        vehicle->guidedModeRTL(false /* smartRTL */);
+    }
+    _stopAerokontikiGuidedLaunch(warning);
+}
+
+bool MissionController::startAerokontikiGuidedLaunch(void)
+{
+    if (!_masterController->aerokontikiControl()) {
+        const bool aerokontikiMission = _aerokontikiLaunchPlan().valid;
+        qCCritical(MissionControllerLog) << "AerokontikiControl launch-blocked"
+                                        << "controller" << this
+                                        << "masterController" << _masterController
+                                        << "reason observer-controller"
+                                        << "aerokontikiMission" << aerokontikiMission;
+        return aerokontikiMission;
+    }
+
+    if (_aerokontikiLaunchState != AerokontikiLaunchIdle) {
+        qgcApp()->showAppMessage(tr("Aerokontiki guided launch is already running."));
+        return true;
+    }
+
+    const AerokontikiLaunchPlan_t launchPlan = _aerokontikiLaunchPlan();
+    if (!launchPlan.valid) {
+        return false;
+    }
+
+    if (!_managerVehicle || _managerVehicle->isOfflineEditingVehicle()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: no active vehicle."));
+        return true;
+    }
+
+    if (!_missionManager || _missionManager->inProgress()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: mission sync is still in progress."));
+        return true;
+    }
+
+    if (!_managerVehicle->guidedModeSupported()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: Guided mode is not supported."));
+        return true;
+    }
+    if (_managerVehicle->vehicleLinkManager()->communicationLost()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: vehicle communication is lost."));
+        return true;
+    }
+
+    const QString flightMode = _managerVehicle->flightMode();
+    if (_aerokontikiModeIsRtl(_managerVehicle, flightMode) || _managerVehicle->landing()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: vehicle is in %1 mode.").arg(_managerVehicle->flightMode()));
+        return true;
+    }
+    if (!_aerokontikiModeIsAutoControl(_managerVehicle, flightMode)) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: switch to Auto mode first."));
+        return true;
+    }
+
+    const QGeoCoordinate launchCoordinate = _managerVehicle->coordinate();
+    if (!launchCoordinate.isValid()) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: vehicle GPS position is not valid."));
+        return true;
+    }
+
+    const double altitudeRelative = _managerVehicle->altitudeRelative()->rawValue().toDouble();
+    if (qIsNaN(altitudeRelative)) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: vehicle relative altitude is not known."));
+        return true;
+    }
+
+    const double launchSpeed = aerokontikiGuidedLaunchSpeed();
+    if (qIsNaN(launchSpeed)) {
+        qgcApp()->showAppMessage(tr("Unable to start aerokontiki launch: profile takeoff speed is not valid."));
+        return true;
+    }
+
+    const double profileSpeed = _planViewSettings->currentProfileTakeOffSpeed()->rawValue().toDouble();
+    qCInfo(MissionControllerLog) << "AerokontikiSpeed launch-start"
+                                << "controller" << this
+                                << "profileMps" << profileSpeed
+                                << "profileKph" << profileSpeed * 3.6
+                                << "storedMps" << _aerokontikiLaunchSpeed
+                                << "storedKph" << _aerokontikiLaunchSpeed * 3.6
+                                << "effectiveMps" << launchSpeed
+                                << "effectiveKph" << launchSpeed * 3.6
+                                << "alreadyArmed" << _managerVehicle->armed()
+                                << "alreadyFlying" << _managerVehicle->flying();
+
+    _aerokontikiLaunchVehicle = _managerVehicle;
+    _aerokontikiActivePlan = launchPlan;
+    _aerokontikiLaunchCoordinate = launchCoordinate;
+    _aerokontikiLegStartCoordinate = launchCoordinate;
+    _aerokontikiTakeoffAltitude = launchPlan.takeoffAltitude;
+    _aerokontikiLaunchCompleted = false;
+    _aerokontikiVehicleWasArmed = _managerVehicle->armed();
+    _aerokontikiTakeoffCommandSent = false;
+    _aerokontikiLaunchPaused = false;
+    _aerokontikiLaunchSpeed = launchSpeed;
+    _aerokontikiCommunicationLost = false;
+    _aerokontikiFreshHeartbeat = false;
+    _aerokontikiFreshPosition = false;
+    _aerokontikiReconnectValidationStarted = false;
+    _aerokontikiServoCommandSent = false;
+    const bool alreadyFlying = _managerVehicle->armed() && (_managerVehicle->flying() || altitudeRelative > launchPlan.takeoffAltitude + 0.5);
+    _aerokontikiWaypointIndex = 0;
+    if (alreadyFlying) {
+        const double altitudeFloor = altitudeRelative - 3.0;
+        while (_aerokontikiWaypointIndex < launchPlan.haulTransitionIndex &&
+               launchPlan.waypoints[_aerokontikiWaypointIndex].altitudeRelative < altitudeFloor) {
+            _aerokontikiWaypointIndex++;
+        }
+    }
+    _aerokontikiLaunchState = alreadyFlying ? AerokontikiLaunchWaypoint : AerokontikiLaunchTakeoff;
+    _aerokontikiProgressState = _aerokontikiLaunchState;
+    _aerokontikiProgressAltitude = altitudeRelative;
+    _aerokontikiProgressDistance = alreadyFlying ?
+        _managerVehicle->coordinate().distanceTo(launchPlan.waypoints[_aerokontikiWaypointIndex].coordinate) :
+        qQNaN();
+    _aerokontikiLaunchElapsed.restart();
+    _aerokontikiProgressElapsed.restart();
+    emit aerokontikiGuidedLaunchActiveChanged();
+    emit aerokontikiGuidedLaunchPausedChanged();
+    emit aerokontikiGuidedLaunchSpeedChanged();
+
+    if (alreadyFlying) {
+        const AerokontikiGuidedWaypoint_t& waypoint = launchPlan.waypoints[_aerokontikiWaypointIndex];
+        _sendAerokontikiGuidedVelocityTarget(waypoint.coordinate,
+                                             waypoint.altitudeRelative,
+                                             aerokontikiGuidedLaunchSpeed());
+    } else if (launchSpeed > 0.0) {
+        _managerVehicle->guidedModeTakeoff(_aerokontikiTakeoffAltitude);
+        _aerokontikiTakeoffCommandSent = true;
+    }
+    _aerokontikiLaunchTimer.start();
+
+    return true;
+}
+
+void MissionController::_stopAerokontikiGuidedLaunch(const QString& message)
+{
+    const bool wasActive = _aerokontikiLaunchState != AerokontikiLaunchIdle;
+    const bool wasPaused = _aerokontikiLaunchPaused;
+    const bool wasHaulPhase = _aerokontikiHaulPhase;
+
+    _aerokontikiLaunchTimer.stop();
+    _aerokontikiLaunchVehicle = nullptr;
+    _aerokontikiLaunchState = AerokontikiLaunchIdle;
+    _aerokontikiActivePlan = AerokontikiLaunchPlan_t();
+    _aerokontikiLaunchCoordinate = QGeoCoordinate();
+    _aerokontikiLegStartCoordinate = QGeoCoordinate();
+    _aerokontikiTakeoffAltitude = qQNaN();
+    _aerokontikiWaypointIndex = -1;
+    _aerokontikiVehicleWasArmed = false;
+    _aerokontikiTakeoffCommandSent = false;
+    _aerokontikiLaunchPaused = false;
+    _aerokontikiHaulPhase = false;
+    _aerokontikiLaunchSpeed = qQNaN();
+    _aerokontikiProgressState = AerokontikiLaunchIdle;
+    _aerokontikiProgressAltitude = qQNaN();
+    _aerokontikiProgressDistance = qQNaN();
+    _aerokontikiCommunicationLost = false;
+    _aerokontikiFreshHeartbeat = false;
+    _aerokontikiFreshPosition = false;
+    _aerokontikiReconnectValidationStarted = false;
+    _aerokontikiServoCommandSent = false;
+
+    if (wasActive) {
+        emit aerokontikiGuidedLaunchActiveChanged();
+    }
+    if (wasPaused) {
+        emit aerokontikiGuidedLaunchPausedChanged();
+    }
+    if (wasHaulPhase) {
+        emit aerokontikiGuidedLaunchHaulPhaseChanged();
+    }
+    emit aerokontikiGuidedLaunchSpeedChanged();
+
+    if (!message.isEmpty()) {
+        qgcApp()->showAppMessage(message);
+    }
+}
+
+void MissionController::_aerokontikiFlightModeTick(void)
+{
+    if (!_masterController->aerokontikiControl()) {
+        _aerokontikiFlightModeTimer.stop();
+        if (_aerokontikiLaunchState != AerokontikiLaunchIdle) {
+            qCCritical(MissionControllerLog) << "AerokontikiControl launch-stopped"
+                                            << "controller" << this
+                                            << "reason observer-controller";
+            _stopAerokontikiGuidedLaunch();
+        }
+        return;
+    }
+
+    Vehicle* vehicle = _managerVehicle;
+    if (!vehicle || vehicle->isOfflineEditingVehicle()) {
+        return;
+    }
+
+    if (vehicle->vehicleLinkManager()->communicationLost()) {
+        return;
+    }
+
+    const QString flightMode = vehicle->flightMode();
+
+    const bool landMode = flightMode.compare(vehicle->landFlightMode(), Qt::CaseInsensitive) == 0 ||
+                          flightMode.compare(QStringLiteral("Land"), Qt::CaseInsensitive) == 0;
+    if (_aerokontikiModeIsRtl(vehicle, flightMode) || landMode) {
+        if (_aerokontikiLaunchState != AerokontikiLaunchIdle) {
+            _stopAerokontikiGuidedLaunch();
+        }
+        return;
+    }
+
+    if (!vehicle->armed()) {
+        _aerokontikiLaunchCompleted = false;
+    }
+
+    if (_aerokontikiLaunchState != AerokontikiLaunchIdle) {
+        if (_aerokontikiModeIsManual(vehicle, flightMode)) {
+            _pauseAerokontikiGuidedLaunch();
+        } else if (_aerokontikiModeIsAutoControl(vehicle, flightMode)) {
+            _resumeAerokontikiGuidedLaunch();
+        } else {
+            qCWarning(MissionControllerLog) << "Aerokontiki guided mission stopped"
+                                            << "reason unexpected-flight-mode"
+                                            << "flightMode" << flightMode;
+            _stopAerokontikiGuidedLaunch();
+        }
+        return;
+    }
+
+    if (_aerokontikiModeIsAutoControl(vehicle, flightMode) &&
+        vehicle->armed() &&
+        vehicle->flying() &&
+        !_aerokontikiLaunchCompleted &&
+        !_missionManager->inProgress()) {
+        const AerokontikiLaunchPlan_t launchPlan = _aerokontikiLaunchPlan();
+        if (launchPlan.valid) {
+            startAerokontikiGuidedLaunch();
+        }
+    }
+}
+
+void MissionController::_aerokontikiGuidedLaunchTick(void)
+{
+    if (!_masterController->aerokontikiControl()) {
+        qCCritical(MissionControllerLog) << "AerokontikiControl launch-stopped"
+                                        << "controller" << this
+                                        << "reason observer-controller";
+        _stopAerokontikiGuidedLaunch();
+        return;
+    }
+
+    if (_aerokontikiLaunchState == AerokontikiLaunchIdle) {
+        _aerokontikiLaunchTimer.stop();
+        return;
+    }
+
+    if (!_aerokontikiLaunchVehicle || _aerokontikiLaunchVehicle != _managerVehicle) {
+        _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided launch cancelled: active vehicle changed."));
+        return;
+    }
+
+    Vehicle* vehicle = _aerokontikiLaunchVehicle;
+    const bool communicationLost = vehicle->vehicleLinkManager()->communicationLost();
+    if (communicationLost) {
+        if (!_aerokontikiCommunicationLost) {
+            qCWarning(MissionControllerLog) << "Aerokontiki guided mission telemetry lost"
+                                            << "vehicleId" << vehicle->id()
+                                            << "state" << static_cast<int>(_aerokontikiLaunchState)
+                                            << "waypointIndex" << _aerokontikiWaypointIndex;
+            _aerokontikiCommunicationLost = true;
+            _aerokontikiFreshHeartbeat = false;
+            _aerokontikiFreshPosition = false;
+            _aerokontikiReconnectValidationStarted = false;
+        }
+        _aerokontikiProgressElapsed.restart();
+        return;
+    }
+
+    if (_aerokontikiCommunicationLost) {
+        if (!_aerokontikiReconnectValidationStarted) {
+            _aerokontikiReconnectValidationStarted = true;
+            _aerokontikiReconnectElapsed.restart();
+        }
+
+        if (!_aerokontikiFreshHeartbeat || !_aerokontikiFreshPosition) {
+            static const int reconnectValidationTimeoutMsec = 10000;
+            if (_aerokontikiReconnectElapsed.elapsed() > reconnectValidationTimeoutMsec) {
+                _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided mission stopped: fresh vehicle position was not received after reconnect."));
+            }
+            return;
+        }
+
+        const AerokontikiLaunchPlan_t currentPlan = _aerokontikiLaunchPlan();
+        if (!currentPlan.valid || currentPlan.fingerprint != _aerokontikiActivePlan.fingerprint) {
+            _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided mission stopped: the uploaded mission changed while telemetry was disconnected."));
+            return;
+        }
+
+        const QString reconnectedMode = vehicle->flightMode();
+        const bool landMode = reconnectedMode.compare(vehicle->landFlightMode(), Qt::CaseInsensitive) == 0 ||
+                              reconnectedMode.compare(QStringLiteral("Land"), Qt::CaseInsensitive) == 0;
+        _aerokontikiCommunicationLost = false;
+        _aerokontikiReconnectValidationStarted = false;
+        _aerokontikiProgressElapsed.restart();
+
+        if (_aerokontikiModeIsRtl(vehicle, reconnectedMode) || landMode) {
+            qCWarning(MissionControllerLog) << "Aerokontiki guided mission not resumed after reconnect"
+                                            << "flightMode" << reconnectedMode;
+            _stopAerokontikiGuidedLaunch();
+            return;
+        }
+        if (_aerokontikiModeIsManual(vehicle, reconnectedMode)) {
+            _pauseAerokontikiGuidedLaunch();
+            return;
+        }
+        if (!_aerokontikiModeIsAutoControl(vehicle, reconnectedMode)) {
+            qCWarning(MissionControllerLog) << "Aerokontiki guided mission not resumed after reconnect"
+                                            << "reason unexpected-flight-mode"
+                                            << "flightMode" << reconnectedMode;
+            _stopAerokontikiGuidedLaunch();
+            return;
+        }
+
+        _aerokontikiLegStartCoordinate = vehicle->coordinate();
+        _resumeAerokontikiGuidedLaunch();
+        qCInfo(MissionControllerLog) << "Aerokontiki guided mission resumed after reconnect"
+                                    << "vehicleId" << vehicle->id()
+                                    << "state" << static_cast<int>(_aerokontikiLaunchState)
+                                    << "waypointIndex" << _aerokontikiWaypointIndex;
+    }
+
+    if (vehicle->armed()) {
+        _aerokontikiVehicleWasArmed = true;
+    } else if (_aerokontikiLaunchElapsed.isValid() &&
+               _aerokontikiLaunchElapsed.elapsed() > 10000 &&
+               aerokontikiGuidedLaunchSpeed() > 0.0) {
+        _stopAerokontikiGuidedLaunch(_aerokontikiVehicleWasArmed ?
+                                     tr("Aerokontiki guided launch cancelled: vehicle disarmed.") :
+                                     tr("Aerokontiki guided launch cancelled: vehicle did not arm within 10 seconds."));
+        return;
+    }
+
+    const QString flightMode = vehicle->flightMode();
+    if (_aerokontikiModeIsRtl(vehicle, flightMode)) {
+        _stopAerokontikiGuidedLaunch();
+        return;
+    }
+
+    if (flightMode.compare(vehicle->landFlightMode(), Qt::CaseInsensitive) == 0 ||
+        flightMode.compare(QStringLiteral("Land"), Qt::CaseInsensitive) == 0) {
+        _stopAerokontikiGuidedLaunch();
+        return;
+    }
+
+    if (_aerokontikiModeIsManual(vehicle, flightMode)) {
+        _pauseAerokontikiGuidedLaunch();
+        return;
+    }
+
+    if (!_aerokontikiModeIsAutoControl(vehicle, flightMode)) {
+        qCWarning(MissionControllerLog) << "Aerokontiki guided mission stopped"
+                                        << "reason unexpected-flight-mode"
+                                        << "flightMode" << flightMode;
+        _stopAerokontikiGuidedLaunch();
+        return;
+    }
+
+    if (_aerokontikiLaunchPaused) {
+        _resumeAerokontikiGuidedLaunch();
+    }
+
+    const double altitudeRelative = vehicle->altitudeRelative()->rawValue().toDouble();
+    if (qIsNaN(altitudeRelative)) {
+        _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided launch cancelled: vehicle relative altitude is not known."));
+        return;
+    }
+
+    double distanceToTarget = qQNaN();
+    if (_aerokontikiLaunchState == AerokontikiLaunchWaypoint &&
+        _aerokontikiWaypointIndex >= 0 &&
+        _aerokontikiWaypointIndex < _aerokontikiActivePlan.waypoints.count()) {
+        distanceToTarget = vehicle->coordinate().distanceTo(_aerokontikiActivePlan.waypoints[_aerokontikiWaypointIndex].coordinate);
+    }
+
+    static const int noProgressTimeoutMsec = 60000;
+    static const double altitudeProgressMeters = 0.3;
+    static const double distanceProgressMeters = 3.0;
+    bool madeProgress = _aerokontikiLaunchState != _aerokontikiProgressState ||
+                        qIsNaN(_aerokontikiProgressAltitude) ||
+                        altitudeRelative > _aerokontikiProgressAltitude + altitudeProgressMeters;
+    if (_aerokontikiLaunchState == AerokontikiLaunchWaypoint &&
+        !qIsNaN(distanceToTarget) &&
+        (qIsNaN(_aerokontikiProgressDistance) || distanceToTarget < _aerokontikiProgressDistance - distanceProgressMeters)) {
+        madeProgress = true;
+    }
+
+    if (madeProgress) {
+        _aerokontikiProgressState = _aerokontikiLaunchState;
+        _aerokontikiProgressAltitude = altitudeRelative;
+        _aerokontikiProgressDistance = distanceToTarget;
+        _aerokontikiProgressElapsed.restart();
+    } else if ((_aerokontikiLaunchState == AerokontikiLaunchTakeoff ||
+                _aerokontikiLaunchState == AerokontikiLaunchWaypoint) &&
+               _aerokontikiProgressElapsed.isValid() &&
+               _aerokontikiProgressElapsed.elapsed() > noProgressTimeoutMsec) {
+        _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided mission timed out: no climb or forward progress. Vehicle remains in Guided mode."));
+        return;
+    }
+
+    static const double takeoffAltitudeTolerance = 0.4;
+
+    switch (_aerokontikiLaunchState) {
+    case AerokontikiLaunchTakeoff:
+        if (!_aerokontikiTakeoffCommandSent) {
+            vehicle->guidedModeTakeoff(_aerokontikiTakeoffAltitude);
+            _aerokontikiTakeoffCommandSent = true;
+        } else if (vehicle->armed() &&
+            vehicle->flying() &&
+            altitudeRelative >= _aerokontikiTakeoffAltitude - takeoffAltitudeTolerance) {
+            _aerokontikiLaunchState = AerokontikiLaunchWaypoint;
+            _aerokontikiLegStartCoordinate = vehicle->coordinate();
+            _aerokontikiProgressState = _aerokontikiLaunchState;
+            _aerokontikiProgressAltitude = altitudeRelative;
+            _aerokontikiProgressDistance = vehicle->coordinate().distanceTo(_aerokontikiActivePlan.waypoints[_aerokontikiWaypointIndex].coordinate);
+            _aerokontikiProgressElapsed.restart();
+            const AerokontikiGuidedWaypoint_t& waypoint = _aerokontikiActivePlan.waypoints[_aerokontikiWaypointIndex];
+            _sendAerokontikiGuidedVelocityTarget(waypoint.coordinate,
+                                                 waypoint.altitudeRelative,
+                                                 aerokontikiGuidedLaunchSpeed());
+        }
+        break;
+
+    case AerokontikiLaunchWaypoint: {
+        if (_aerokontikiWaypointIndex < 0 || _aerokontikiWaypointIndex >= _aerokontikiActivePlan.waypoints.count()) {
+            _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided mission stopped: waypoint state is invalid."));
+            return;
+        }
+
+        const AerokontikiGuidedWaypoint_t& waypoint = _aerokontikiActivePlan.waypoints[_aerokontikiWaypointIndex];
+        if (_aerokontikiWaypointReached(waypoint, distanceToTarget, altitudeRelative)) {
+            qCInfo(MissionControllerLog) << "Aerokontiki guided waypoint reached"
+                                        << "waypointIndex" << _aerokontikiWaypointIndex
+                                        << "sequenceNumber" << waypoint.sequenceNumber
+                                        << "distanceMeters" << distanceToTarget
+                                        << "altitudeRelative" << altitudeRelative;
+
+            if (_aerokontikiWaypointIndex == _aerokontikiActivePlan.haulTransitionIndex) {
+                _setAerokontikiHaulPhase(true);
+            }
+
+            _aerokontikiWaypointIndex++;
+            if (_aerokontikiWaypointIndex >= _aerokontikiActivePlan.waypoints.count()) {
+                _aerokontikiLaunchState = AerokontikiLaunchDrop;
+                _aerokontikiProgressElapsed.restart();
+                _sendAerokontikiServoCommand();
+                return;
+            }
+
+            _aerokontikiLegStartCoordinate = vehicle->coordinate();
+            _aerokontikiProgressState = _aerokontikiLaunchState;
+            _aerokontikiProgressAltitude = altitudeRelative;
+            const AerokontikiGuidedWaypoint_t& nextWaypoint = _aerokontikiActivePlan.waypoints[_aerokontikiWaypointIndex];
+            _aerokontikiProgressDistance = vehicle->coordinate().distanceTo(nextWaypoint.coordinate);
+            _aerokontikiProgressElapsed.restart();
+            _sendAerokontikiGuidedVelocityTarget(nextWaypoint.coordinate,
+                                                 nextWaypoint.altitudeRelative,
+                                                 aerokontikiGuidedLaunchSpeed());
+        } else {
+            _sendAerokontikiGuidedVelocityTarget(waypoint.coordinate,
+                                                 waypoint.altitudeRelative,
+                                                 aerokontikiGuidedLaunchSpeed());
+        }
+        break;
+    }
+
+    case AerokontikiLaunchDrop:
+        if (_aerokontikiServoCommandSent) {
+            _finishAerokontikiGuidedMission();
+        } else {
+            _sendAerokontikiServoCommand();
+        }
+        break;
+
+    case AerokontikiLaunchIdle:
+        _aerokontikiLaunchTimer.stop();
+        break;
+    }
+}
+
+void MissionController::_aerokontikiMavlinkMessageReceived(const mavlink_message_t& message)
+{
+    if (_aerokontikiLaunchState == AerokontikiLaunchIdle ||
+        !_aerokontikiLaunchVehicle ||
+        !_aerokontikiCommunicationLost ||
+        message.sysid != _aerokontikiLaunchVehicle->id()) {
+        return;
+    }
+
+    if (message.msgid == MAVLINK_MSG_ID_HEARTBEAT &&
+        message.compid == _aerokontikiLaunchVehicle->defaultComponentId()) {
+        _aerokontikiFreshHeartbeat = true;
+    } else if (message.msgid == MAVLINK_MSG_ID_GLOBAL_POSITION_INT) {
+        _aerokontikiFreshPosition = true;
+    }
+}
+
 /// Converts from visual items to MissionItems
 ///     @param missionItemParent QObject parent for newly allocated MissionItems
 /// @return true: Mission end action was added to end of list
@@ -321,7 +1374,7 @@ VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordin
 {
     int sequenceNumber = _nextSequenceNumber();
     SimpleMissionItem * newItem = new SimpleMissionItem(_masterController, _flyView, false /* forLoad */);
-    if (visualItemIndex == 2 /*|| visualItemIndex == 3*/)
+    if (command == MAV_CMD_NAV_WAYPOINT && visualItemIndex == 2 /*|| visualItemIndex == 3*/)
     {
         newItem->speedSection()->setSpecifyFlightSpeed(true);
         newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toDouble());
@@ -337,7 +1390,21 @@ VisualMissionItem* MissionController::_insertSimpleMissionItemWorker(QGeoCoordin
     newItem->setCoordinate(coordinate);
     newItem->setCommand(command);
 
-    if (visualItemIndex == 3)
+    if (command == MAV_CMD_DO_CHANGE_SPEED) {
+        const double speed = visualItemIndex == 2 ?
+            qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toDouble() :
+            qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble();
+        newItem->missionItem().setFrame(MAV_FRAME_MISSION);
+        newItem->missionItem().setParam1(_controllerVehicle->multiRotor() ? 1 : 0);
+        newItem->missionItem().setParam2(speed);
+        newItem->missionItem().setParam3(-1);
+        newItem->missionItem().setParam4(0);
+        newItem->missionItem().setParam5(0);
+        newItem->missionItem().setParam6(0);
+        newItem->missionItem().setParam7(0);
+    }
+
+    if (command == MAV_CMD_NAV_WAYPOINT && visualItemIndex == 3)
     {
         newItem->speedSection()->setSpecifyFlightSpeed(true);
         newItem->speedSection()->flightSpeed()->setRawValue(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toDouble());
@@ -396,10 +1463,10 @@ VisualMissionItem* MissionController::insertSimpleMissionItem(QGeoCoordinate coo
     return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_NAV_WAYPOINT, visualItemIndex, makeCurrentItem);
 }
 
-// VisualMissionItem* MissionController::insertSimpleMissionItemSpeed(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
-// {
-//     return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_DO_CHANGE_SPEED, visualItemIndex, makeCurrentItem);
-// }
+VisualMissionItem* MissionController::insertSimpleMissionItemSpeed(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
+{
+    return _insertSimpleMissionItemWorker(coordinate, MAV_CMD_DO_CHANGE_SPEED, visualItemIndex, makeCurrentItem);
+}
 
 VisualMissionItem* MissionController::insertSimpleMissionItemServo(QGeoCoordinate coordinate, int visualItemIndex, bool makeCurrentItem)
 {
@@ -657,6 +1724,8 @@ void MissionController::removeVisualItem(int viIndex)
 
 void MissionController::removeAll(void)
 {
+    _stopAerokontikiGuidedLaunch();
+
     if (_visualItems) {
         _deinitAllVisualItems();
         _visualItems->clearAndDeleteContents();
@@ -1942,6 +3011,7 @@ void MissionController::_recalcAllWithCoordinate(const QGeoCoordinate& coordinat
     _recalcSequence();
     _recalcChildItems();
     emit _recalcFlightPathSegmentsSignal();
+    emit aerokontikiGuidedLaunchAvailableChanged();
     _updateTimer.start(UPDATE_TIMEOUT);
 }
 
@@ -1984,6 +3054,7 @@ void MissionController::_initAllVisualItems(void)
 
     emit visualItemsChanged();
     emit containsItemsChanged(containsItems());
+    emit aerokontikiGuidedLaunchAvailableChanged();
     emit plannedHomePositionChanged(plannedHomePosition());
 
     if (!_flyView) {
@@ -2056,6 +3127,8 @@ void MissionController::_itemCommandChanged(void)
 
 void MissionController::_managerVehicleChanged(Vehicle* managerVehicle)
 {
+    _stopAerokontikiGuidedLaunch();
+
     if (_managerVehicle) {
         _missionManager->disconnect(this);
         _managerVehicle->disconnect(this);
@@ -2082,6 +3155,7 @@ void MissionController::_managerVehicleChanged(Vehicle* managerVehicle)
     connect(_managerVehicle, &Vehicle::defaultCruiseSpeedChanged,       this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
     connect(_managerVehicle, &Vehicle::defaultHoverSpeedChanged,        this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
     connect(_managerVehicle, &Vehicle::vehicleTypeChanged,              this, &MissionController::complexMissionItemNamesChanged);
+    connect(_managerVehicle, &Vehicle::mavlinkMessageReceived,          this, &MissionController::_aerokontikiMavlinkMessageReceived);
 
     emit complexMissionItemNamesChanged();
     emit resumeMissionIndexChanged();
@@ -2089,6 +3163,9 @@ void MissionController::_managerVehicleChanged(Vehicle* managerVehicle)
 
 void MissionController::_inProgressChanged(bool inProgress)
 {
+    if (inProgress && _aerokontikiLaunchState != AerokontikiLaunchIdle) {
+        _stopAerokontikiGuidedLaunch(tr("Aerokontiki guided mission stopped because the mission is being synchronized."));
+    }
     emit syncInProgressChanged(inProgress);
 }
 
@@ -2291,6 +3368,7 @@ void MissionController::_scanForAdditionalSettings(QmlObjectListModel* visualIte
 void MissionController::_updateContainsItems(void)
 {
     emit containsItemsChanged(containsItems());
+    emit aerokontikiGuidedLaunchAvailableChanged();
 }
 
 bool MissionController::containsItems(void) const
@@ -2300,6 +3378,8 @@ bool MissionController::containsItems(void) const
 
 void MissionController::removeAllFromVehicle(void)
 {
+    _stopAerokontikiGuidedLaunch();
+
     if (_masterController->offline()) {
         qCWarning(MissionControllerLog) << "MissionControllerLog::removeAllFromVehicle called while offline";
     } else if (syncInProgress()) {

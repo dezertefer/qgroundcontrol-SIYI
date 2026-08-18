@@ -39,6 +39,7 @@ Item {
     PlanMasterController {
         id:                     _planController
         flyView:                true
+        aerokontikiControl:     true
         Component.onCompleted:  start()
     }
 

@@ -44,7 +44,8 @@ Item {
     readonly property string mvStartMissionTitle:           qsTr("Start Mission (MV)")
     readonly property string continueMissionTitle:          qsTr("Continue Mission")
     readonly property string resumeMissionUploadFailTitle:  qsTr("Resume FAILED")
-    readonly property string pauseTitle:                    qsTr("Pause")
+    readonly property string pauseTitle:                    _aerokontikiGuidedLaunchPaused ? qsTr("Resume") : qsTr("Pause")
+    readonly property bool   aerokontikiGuidedLaunchPaused: _aerokontikiGuidedLaunchPaused
     readonly property string mvPauseTitle:                  qsTr("Pause (MV)")
     readonly property string changeAltTitle:                qsTr("Change Altitude")
     readonly property string orbitTitle:                    qsTr("Orbit")
@@ -70,7 +71,7 @@ Item {
              property string setWaypointMessage:                qsTr("Adjust current waypoint to %1.").arg(_actionData)
     readonly property string orbitMessage:                      qsTr("Orbit the vehicle around the specified location.")
     readonly property string landAbortMessage:                  qsTr("Abort the landing sequence.")
-    readonly property string pauseMessage:                      qsTr("Pause the vehicle at it's current position, adjusting altitude up or down as needed.")
+    readonly property string pauseMessage:                      _aerokontikiGuidedLaunchActive ? (_aerokontikiGuidedLaunchPaused ? qsTr("Resume the aerokontiki launch sequence.") : qsTr("Pause the aerokontiki launch sequence at the current position.")) : qsTr("Pause the vehicle at it's current position, adjusting altitude up or down as needed.")
     readonly property string mvPauseMessage:                    qsTr("Pause all vehicles at their current position.")
     readonly property string vtolTransitionFwdMessage:          qsTr("Transition VTOL to fixed wing flight.")
     readonly property string vtolTransitionMRMessage:           qsTr("Transition VTOL to multi-rotor flight.")
@@ -112,16 +113,16 @@ Item {
     property bool showDisarm:           _guidedActionsEnabled && _vehicleArmed && !_vehicleFlying
     property bool showRTL:              _guidedActionsEnabled && _vehicleArmed && _activeVehicle.guidedModeSupported && _vehicleFlying && !_vehicleInRTLMode
     property bool showTakeoff:          _guidedActionsEnabled && _activeVehicle.takeoffVehicleSupported && !_vehicleFlying && _canArm
-    property bool showLand:             _guidedActionsEnabled && _activeVehicle.guidedModeSupported && _vehicleArmed && !_activeVehicle.fixedWing && !_vehicleInLandMode
-    property bool showStartMission:     _guidedActionsEnabled && _missionAvailable && !_missionActive && !_vehicleFlying && _canArm
-    property bool showContinueMission:  _guidedActionsEnabled && _missionAvailable && !_missionActive && _vehicleArmed && _vehicleFlying && (_currentMissionIndex < _missionItemCount - 1)
-    property bool showPause:            _guidedActionsEnabled && _vehicleArmed && _activeVehicle.pauseVehicleSupported && _vehicleFlying && !_vehiclePaused && !_fixedWingOnApproach
+    property bool showLand:             false
+    property bool showStartMission:     _guidedActionsEnabled && _missionAvailable && _aerokontikiGuidedLaunchAvailable && !_aerokontikiGuidedLaunchActive && !_missionActive && !_vehicleFlying && _canArm && _vehicleInGuidedMode
+    property bool showContinueMission:  false
+    property bool showPause:            false
     property bool showChangeAlt:        _guidedActionsEnabled && _vehicleFlying && _activeVehicle.guidedModeSupported && _vehicleArmed && !_missionActive
     property bool showOrbit:            _guidedActionsEnabled && _vehicleFlying && __orbitSupported && !_missionActive
     property bool showROI:              _guidedActionsEnabled && _vehicleFlying && __roiSupported && !_missionActive
     property bool showLandAbort:        _guidedActionsEnabled && _vehicleFlying && _fixedWingOnApproach
     property bool showGotoLocation:     _guidedActionsEnabled && _vehicleFlying
-    property bool showActionList:       _guidedActionsEnabled && (showStartMission || showResumeMission || showChangeAlt || showLandAbort)
+    property bool showActionList:       _guidedActionsEnabled && !_vehicleFlying && showStartMission
 
     // Note: The '_missionItemCount - 2' is a hack to not trigger resume mission when a mission ends with an RTL item
     property bool showResumeMission:    _activeVehicle && !_vehicleArmed && _vehicleWasFlying && _missionAvailable && _resumeMissionIndex > 0 && (_resumeMissionIndex < _missionItemCount - 2)
@@ -141,9 +142,13 @@ Item {
     property bool   _vehicleInMissionMode:  false
     property bool   _vehicleInRTLMode:      false
     property bool   _vehicleInLandMode:     false
+    property bool   _vehicleInGuidedMode:   false
     property int    _missionItemCount:      missionController.missionItemCount
     property int    _currentMissionIndex:   missionController.currentMissionIndex
     property int    _resumeMissionIndex:    missionController.resumeMissionIndex
+    property bool   _aerokontikiGuidedLaunchActive: missionController ? missionController.aerokontikiGuidedLaunchActive : false
+    property bool   _aerokontikiGuidedLaunchPaused: missionController ? missionController.aerokontikiGuidedLaunchPaused : false
+    property bool   _aerokontikiGuidedLaunchAvailable: missionController ? missionController.aerokontikiGuidedLaunchAvailable : false
     property bool   _hideEmergenyStop:      !_corePluginOptions.flyView.guidedBarShowEmergencyStop
     property bool   _hideOrbit:             !_corePluginOptions.flyView.guidedBarShowOrbit
     property bool   _hideROI:               !_corePluginOptions.flyView.guidedBarShowROI
@@ -199,9 +204,6 @@ Item {
             console.log("showStartMission", showStartMission)
         }
         _outputState()
-        if (showStartMission) {
-            confirmAction(actionStartMission)
-        }
     }
     onShowContinueMissionChanged: {
         if (_corePlugin.guidedActionsControllerLogging()) {
@@ -263,6 +265,7 @@ Item {
         _vehiclePaused =        _activeVehicle ? _flightMode === _activeVehicle.pauseFlightMode : false
         _vehicleInRTLMode =     _activeVehicle ? _flightMode === _activeVehicle.rtlFlightMode || _flightMode === _activeVehicle.smartRTLFlightMode : false
         _vehicleInLandMode =    _activeVehicle ? _flightMode === _activeVehicle.landFlightMode : false
+        _vehicleInGuidedMode =  _activeVehicle ? _flightMode === _activeVehicle.gotoFlightMode || _flightMode === "Guided" : false
         _vehicleInMissionMode = _activeVehicle ? _flightMode === _activeVehicle.missionFlightMode : false // Must be last to get correct signalling for showStartMission popups
     }
 
@@ -396,10 +399,6 @@ Item {
         case actionRTL:
             confirmDialog.title = rtlTitle
             confirmDialog.message = rtlMessage
-            if (_activeVehicle.supportsSmartRTL) {
-                confirmDialog.optionText = qsTr("Smart RTL")
-                confirmDialog.optionChecked = false
-            }
             confirmDialog.hideTrigger = Qt.binding(function() { return !showRTL })
             break;
         case actionChangeAlt:
@@ -434,8 +433,10 @@ Item {
             confirmDialog.title = pauseTitle
             confirmDialog.message = pauseMessage
             confirmDialog.hideTrigger = Qt.binding(function() { return !showPause })
-            altitudeSlider.reset()
-            altitudeSlider.visible = true
+            if (!_aerokontikiGuidedLaunchActive) {
+                altitudeSlider.reset()
+                altitudeSlider.visible = true
+            }
             break;
         case actionMVPause:
             confirmDialog.title = mvPauseTitle
@@ -473,7 +474,7 @@ Item {
         var rgVehicle;
         switch (actionCode) {
         case actionRTL:
-            _activeVehicle.guidedModeRTL(optionChecked)
+            _activeVehicle.guidedModeRTL(false /* smartRTL */)
             break
         case actionLand:
             _activeVehicle.guidedModeLand()
@@ -486,6 +487,10 @@ Item {
             missionController.resumeMission(missionController.resumeMissionIndex)
             break
         case actionStartMission:
+            if (!missionController || !missionController.startAerokontikiGuidedLaunch()) {
+                _activeVehicle.startMission()
+            }
+            break
         case actionContinueMission:
             _activeVehicle.startMission()
             break
@@ -523,7 +528,9 @@ Item {
             _activeVehicle.abortLanding(50)     // hardcoded value for climbOutAltitude that is currently ignored
             break
         case actionPause:
-            _activeVehicle.guidedModeChangeAltitude(actionAltitudeChange, true /* pauseVehicle */)
+            if (!missionController || !missionController.toggleAerokontikiGuidedLaunchPause()) {
+                _activeVehicle.guidedModeChangeAltitude(actionAltitudeChange, true /* pauseVehicle */)
+            }
             break
         case actionMVPause:
             rgVehicle = QGroundControl.multiVehicleManager.vehicles

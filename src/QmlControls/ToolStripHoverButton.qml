@@ -36,7 +36,11 @@ Button {
     property real imageScale:       0.4
     property real contentMargins:   innerText.height * 0.1
 
-    property color _currentContentColor:  (checked || pressed) ? qgcPal.buttonHighlightText : qgcPal.buttonText
+    property bool  _hasActionBackgroundColor: toolStripAction && typeof toolStripAction.backgroundColor !== "undefined"
+    property bool  _hasActionTextColor:       toolStripAction && typeof toolStripAction.textColor !== "undefined"
+    property color _actionBackgroundColor:    _hasActionBackgroundColor ? toolStripAction.backgroundColor : qgcPal.toolbarBackground
+    property color _actionTextColor:          _hasActionTextColor ? toolStripAction.textColor : qgcPal.buttonText
+    property color _currentContentColor:      _hasActionTextColor ? _actionTextColor : ((checked || pressed) ? qgcPal.buttonHighlightText : qgcPal.buttonText)
 
     signal dropped(int index)
 
@@ -90,7 +94,9 @@ Button {
 
     background: Rectangle {
         id:             buttonBkRect
-        color:          (control.checked || control.pressed) ?
+        color:          _hasActionBackgroundColor ?
+                            _actionBackgroundColor :
+                        (control.checked || control.pressed) ?
                             qgcPal.buttonHighlight :
                             (control.hovered ? qgcPal.toolStripHoverColor : qgcPal.toolbarBackground)
         anchors.fill:   parent

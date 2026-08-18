@@ -520,15 +520,15 @@ Item {
             _missionController.insertTakeoffItem(vehicleCoordinate, nextIndex++, true)
             _setLastItemAltRel(takeoffRel)
 
-            // (2) WP @ A (placeholder) -> worker sets slow/takeoff speed here (index 2)
-            _missionController.insertSimpleMissionItem(vehicleCoordinate, nextIndex++, true)
-            // worker also sets 3 m here; that's fine, we leave it
+            // (2) Slow/takeoff speed for the climb leg. This replaces the old
+            // waypoint above A so mission resume cannot fly backward to launch.
+            _missionController.insertSimpleMissionItemSpeed(vehicleCoordinate, nextIndex++, true)
 
-            // (3) D (cable-end) -> worker switches to haul speed here (index 3)
+            // (3) D (cable-end) -> worker applies haul speed for the next leg
             _missionController.insertSimpleMissionItem(toRelative(backend.D), nextIndex++, true)
             _setLastItemAltRel(dAltRel)  // ensure correct REL altitude at cable end
 
-            // (4) C (haul altitude), only if meaningfully different from D
+            // (4) C (haul altitude), only if meaningfully different from D.
             if (!coordsAlmostEqual(backend.D, backend.C)) {
                 _missionController.insertSimpleMissionItem(toRelative(backend.C), nextIndex++, true)
                 _setLastItemAltRel(haulRel)
@@ -1842,10 +1842,37 @@ Item {
                         visible:            _planMasterController.dirty
                     }
 
-                    SectionHeader {
+                    RowLayout {
                         id:                 storageSection
                         Layout.fillWidth:   true
-                        text:               qsTr("Current Profile ")
+                        spacing:            ScreenTools.defaultFontPixelWidth * 0.5
+
+                        QGCLabel {
+                            text:                   qsTr("Profile")
+                            Layout.fillWidth:       true
+                        }
+
+                        QGCButton {
+                            text:                   qsTr("Edit")
+                            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 5
+                            visible:                !_isNew && !_isEdit && !_isDel
+                            onClicked: {
+                                _isNew = false
+                                _isDel = false
+                                _isEdit = true
+                            }
+                        }
+
+                        QGCButton {
+                            text:                   qsTr("New")
+                            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 5
+                            visible:                !_isNew && !_isEdit && !_isDel
+                            onClicked: {
+                                _isEdit = false
+                                _isDel = false
+                                _isNew = true
+                            }
+                        }
                     }
 
                     QGCTextField {
@@ -2011,21 +2038,6 @@ Item {
                                 scale.currentIndex = scale.find(_planViewSettings.currentProfileName.rawValue)
                                 _isNew = false
                             }
-                        }
-
-                        QGCButton {
-                            id: testBut
-                            text:               qsTr("New Profile")
-                            Layout.fillWidth:   true
-                            visible:            !_isNew && !_isEdit && !_isDel
-                            onClicked:          _isNew = true
-                        }
-
-                        QGCButton {
-                            text:               qsTr("Edit Current Profile")
-                            Layout.fillWidth:   true
-                            visible:            !_isNew && !_isEdit && !_isDel
-                            onClicked:          _isEdit = true
                         }
 
                         QGCButton {

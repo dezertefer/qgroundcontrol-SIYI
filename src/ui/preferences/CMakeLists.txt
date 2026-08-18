@@ -10,6 +10,6 @@ add_custom_target(UiPreferencesQml
 		MockLink.qml
 		MockLinkSettings.qml
 		SerialSettings.qml
-		TcpSettings.qml
+	TcpSettings.qml
 		UdpSettings.qml
 )

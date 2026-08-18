@@ -2550,7 +2550,23 @@ QString Vehicle::_vehicleIdSpeech()
 
 void Vehicle::_handleFlightModeChanged(const QString& flightMode)
 {
-    _say(tr("%1 %2 flight mode").arg(_vehicleIdSpeech()).arg(flightMode));
+    QString userFlightMode = flightMode;
+    if (flightMode.compare(takeControlFlightMode(), Qt::CaseInsensitive) == 0 ||
+        flightMode.compare(QStringLiteral("Loiter"), Qt::CaseInsensitive) == 0) {
+        userFlightMode = tr("Manual");
+    } else if (flightMode.compare(gotoFlightMode(), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(missionFlightMode(), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(QStringLiteral("Guided"), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(QStringLiteral("Auto"), Qt::CaseInsensitive) == 0) {
+        userFlightMode = tr("Auto");
+    } else if (flightMode.compare(rtlFlightMode(), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(smartRTLFlightMode(), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(QStringLiteral("RTL"), Qt::CaseInsensitive) == 0 ||
+               flightMode.compare(QStringLiteral("Smart RTL"), Qt::CaseInsensitive) == 0) {
+        userFlightMode = tr("RTL");
+    }
+
+    _say(tr("%1 %2 flight mode").arg(_vehicleIdSpeech()).arg(userFlightMode));
     emit guidedModeChanged(_firmwarePlugin->isGuidedMode(this));
 }
 
@@ -3013,7 +3029,7 @@ void Vehicle::_sendMavCommandFromList(int index)
         } else {
             emit mavCommandResult(_id, commandEntry.targetCompId, commandEntry.command, MAV_RESULT_FAILED, MavCmdResultFailureNoResponseToCommand);
         }
-        if (commandEntry.showError) {
+        if (commandEntry.showError && commandEntry.command != MAV_CMD_NAV_TAKEOFF) {
             qgcApp()->showAppMessage(tr("Vehicle did not respond to command: %1").arg(rawCommandName));
         }
         return;
