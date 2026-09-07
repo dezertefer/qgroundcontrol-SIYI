@@ -181,12 +181,12 @@ Item {
 
     FlyViewToolStrip {
         id:                     toolStrip
-        anchors.leftMargin:     _toolsMargin/3 + parentToolInsets.leftEdgeCenterInset
-        anchors.topMargin:      _toolsMargin/3 + parentToolInsets.topEdgeLeftInset
+        anchors.leftMargin:     parentToolInsets.leftEdgeCenterInset
+        anchors.topMargin:      parentToolInsets.topEdgeLeftInset
         anchors.left:           parent.left
         anchors.top:            parent.top
         z:                      QGroundControl.zOrderWidgets
-        maxHeight:              (parent.height - y - parentToolInsets.bottomEdgeLeftInset) - _toolsMargin*2
+        maxHeight:              (parent.height - y - parentToolInsets.bottomEdgeLeftInset) / scaleFactor
         visible:                !QGroundControl.videoManager.fullScreen
 
         // === added ===
@@ -213,8 +213,8 @@ Item {
         width:                  ScreenTools.defaultFontPixelWidth * 8
         radius:                 ScreenTools.defaultFontPixelWidth / 2
         color:                  qgcPal.window
-        border.color:           qgcPal.text
-        border.width:           1
+        border.color:           _phaseColor
+        border.width:           3
         opacity:                0.92
         z:                      QGroundControl.zOrderTopMost
         visible:                !QGroundControl.videoManager.fullScreen &&
@@ -222,14 +222,19 @@ Item {
                                 _missionController.aerokontikiGuidedLaunchActive
 
         property bool _haulPhase:                       _missionController ? _missionController.aerokontikiGuidedLaunchHaulPhase : false
-        property real _profileSpeedMetersPerSecond:     _haulPhase ?
-                                                            QGroundControl.settingsManager.planViewSettings.currentProfileSpeed.rawValue :
-                                                            QGroundControl.settingsManager.planViewSettings.currentProfileTakeOffSpeed.rawValue
+        property bool _speedTouchActive:                false
+        property bool _speedTouchHaulPhase:             false
+        property bool _speedTouchBlocked:               false
+        property bool _syncingFromController:           false
+        property color _phaseColor:                     _haulPhase ? qgcPal.brandingPurple : "#F28C28"
+        property real _profileSpeedMetersPerSecond:     _missionController ? _missionController.aerokontikiGuidedLaunchProfileSpeed : 0
         property real _profileSpeedKph:                 Math.max(0.0, _profileSpeedMetersPerSecond * 3.6)
         property bool _profileAllowsSpeedBoost:         !_haulPhase && _profileSpeedKph <= 3.01
         property real _minSpeedKph:                     1
-        property real _maxSpeedKph:                     Math.max(_minSpeedKph, Math.round(_profileSpeedKph * (_profileAllowsSpeedBoost ? 1.5 : 1.0) * 10) / 10)
-        property real _speedStepKph:                    _maxSpeedKph <= 5 ? 0.5 : 1
+        property real _calculatedMaxSpeedKph:           Math.max(_minSpeedKph, Math.round(_profileSpeedKph * (_profileAllowsSpeedBoost ? 1.5 : 1.0) * 10) / 10)
+        property real _calculatedSpeedStepKph:          _calculatedMaxSpeedKph <= 5 ? 0.5 : 1
+        property real _maxSpeedKph:                     _calculatedMaxSpeedKph
+        property real _speedStepKph:                    _calculatedSpeedStepKph
         property int  _speedStepCount:                  Math.max(0, Math.ceil((_maxSpeedKph - _minSpeedKph) / _speedStepKph))
         property int  _maxSpeedLabelCount:              10
         property int  _speedLabelCount:                 Math.min(_speedStepCount + 1, _maxSpeedLabelCount)
@@ -270,11 +275,50 @@ Item {
 
         function _syncFromController() {
             if (_missionController) {
+                _syncingFromController = true
                 speedSlider.value = Math.max(_minSpeedKph, Math.min(_maxSpeedKph, _missionController.aerokontikiGuidedLaunchSpeed * 3.6))
+                _syncingFromController = false
             }
         }
 
+        function _beginSpeedTouch() {
+            if (_speedTouchActive) {
+                return
+            }
+
+            _speedTouchActive = true
+            _speedTouchHaulPhase = _haulPhase
+            _speedTouchBlocked = false
+        }
+
+        function _speedTouchCanSetSpeed() {
+            return _speedTouchActive &&
+                    !_speedTouchBlocked &&
+                    _speedTouchHaulPhase === _haulPhase
+        }
+
+        function _endSpeedTouch() {
+            var canSetSpeed = _speedTouchCanSetSpeed()
+            _speedTouchActive = false
+            _speedTouchBlocked = false
+            Qt.callLater(_syncFromController)
+            return canSetSpeed
+        }
+
+        function _sendSpeed(speedKph) {
+            if (!_missionController) {
+                return
+            }
+            var boundedSpeedKph = Math.max(_minSpeedKph, Math.min(_maxSpeedKph, speedKph))
+            console.info("AerokontikiSpeed qml-slider requestedKph=" + boundedSpeedKph +
+                         " requestedMps=" + (boundedSpeedKph / 3.6) +
+                         " haulPhase=" + _haulPhase)
+            _missionController.setAerokontikiGuidedLaunchSpeed(boundedSpeedKph / 3.6)
+        }
+
         onVisibleChanged: {
+            _speedTouchActive = false
+            _speedTouchBlocked = false
             if (visible) {
                 _syncFromController()
             }
@@ -283,12 +327,14 @@ Item {
         Connections {
             target: _missionController
             function onAerokontikiGuidedLaunchSpeedChanged() {
-                if (launchSpeedSlider.visible) {
+                if (launchSpeedSlider.visible && !launchSpeedSlider._speedTouchActive) {
                     launchSpeedSlider._syncFromController()
                 }
             }
             function onAerokontikiGuidedLaunchHaulPhaseChanged() {
-                if (launchSpeedSlider.visible) {
+                if (launchSpeedSlider._speedTouchActive) {
+                    launchSpeedSlider._speedTouchBlocked = true
+                } else if (launchSpeedSlider.visible) {
                     launchSpeedSlider._syncFromController()
                 }
             }
@@ -305,7 +351,8 @@ Item {
                 horizontalAlignment:    Text.AlignHCenter
                 wrapMode:               Text.WordWrap
                 text:                   launchSpeedSlider._haulPhase ? qsTr("Haul Speed") : qsTr("Launch Speed")
-                color:                  qgcPal.text
+                color:                  launchSpeedSlider._phaseColor
+                font.bold:              true
                 font.pointSize:         ScreenTools.smallFontPointSize
             }
 
@@ -337,6 +384,7 @@ Item {
                     tickmarksEnabled:       true
                     updateValueWhileDragging: true
                     displayValue:           false
+                    indicatorColor:         launchSpeedSlider._phaseColor
                     rotation:               180
 
                     transform: Rotation {
@@ -345,12 +393,19 @@ Item {
                         angle:      180
                     }
 
+                    onPressedChanged: {
+                        if (pressed) {
+                            launchSpeedSlider._beginSpeedTouch()
+                        } else if (launchSpeedSlider._speedTouchActive) {
+                            launchSpeedSlider._endSpeedTouch()
+                        }
+                    }
+
                     onValueChanged: {
-                        if (launchSpeedSlider.visible && _missionController) {
-                            var speedKph = Math.max(launchSpeedSlider._minSpeedKph, Math.min(launchSpeedSlider._maxSpeedKph, value))
-                            console.info("AerokontikiSpeed qml-slider requestedKph=" + speedKph +
-                                         " requestedMps=" + (speedKph / 3.6))
-                            _missionController.setAerokontikiGuidedLaunchSpeed(speedKph / 3.6)
+                        if (launchSpeedSlider.visible &&
+                                !launchSpeedSlider._syncingFromController &&
+                                launchSpeedSlider._speedTouchCanSetSpeed()) {
+                            launchSpeedSlider._sendSpeed(value)
                         }
                     }
                 }
@@ -386,7 +441,22 @@ Item {
                             y:          launchSpeedSlider._labelY(modelData, height)
                             width:      speedSteps.width
                             height:     Math.max(ScreenTools.defaultFontPixelHeight, speedSteps.height / launchSpeedSlider._speedLabelCount)
-                            onClicked:  speedSlider.value = launchSpeedSlider._speedForLabel(modelData)
+                            onPressed: launchSpeedSlider._beginSpeedTouch()
+                            onCanceled: {
+                                if (launchSpeedSlider._speedTouchActive) {
+                                    launchSpeedSlider._endSpeedTouch()
+                                }
+                            }
+                            onReleased: {
+                                var requestedSpeed = launchSpeedSlider._speedForLabel(modelData)
+                                var canSetSpeed = launchSpeedSlider._endSpeedTouch()
+                                if (canSetSpeed) {
+                                    launchSpeedSlider._syncingFromController = true
+                                    speedSlider.value = requestedSpeed
+                                    launchSpeedSlider._syncingFromController = false
+                                    launchSpeedSlider._sendSpeed(requestedSpeed)
+                                }
+                            }
                         }
                     }
                 }

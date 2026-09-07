@@ -88,6 +88,16 @@
     "decimalPlaces":    1
 },
 {
+    "name":         "currentProfileWinchLength",
+    "shortDesc":    "Profile winch length",
+    "type":         "double",
+    "default":      2000.0,
+    "units":        "m",
+    "min":          10.0,
+    "max":          3050.0,
+    "decimalPlaces":    0
+},
+{
     "name":         "currentProfileTakeOffSpeed",
     "shortDesc":    "Profile takeoff Speed",
     "type":         "double",
@@ -142,6 +152,16 @@
     "min":          20.0,
     "max":          160.0,
     "decimalPlaces":    1
+},
+{
+    "name":         "newProfileWinchLength",
+    "shortDesc":    "Profile winch length",
+    "type":         "double",
+    "default":      2000.0,
+    "units":        "m",
+    "min":          10.0,
+    "max":          3050.0,
+    "decimalPlaces":    0
 },
 {
     "name":         "newProfileTakeOffSpeed",

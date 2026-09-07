@@ -30,31 +30,52 @@ Item {
     property var  _activeVehicle:                   QGroundControl.multiVehicleManager.activeVehicle
     property bool _vehicleArmed:                    _activeVehicle ? _activeVehicle.armed : true // true here prevents pop up from showing during shutdown
     property bool _vehicleWasArmed:                 false
+    property bool _vehicleFlying:                   _activeVehicle ? _activeVehicle.flying : false
+    property bool _vehicleWasFlying:                false
     property bool _vehicleInMissionFlightMode:      _activeVehicle ? (_activeVehicle.flightMode === _activeVehicle.missionFlightMode) : false
     property bool _vehicleWasInMissionFlightMode:   false
-    property bool _showMissionCompleteDialog:       _vehicleWasArmed && _vehicleWasInMissionFlightMode &&
-                                                        (missionController.containsItems || geoFenceController.containsItems || rallyPointController.containsItems ||
-                                                        (_activeVehicle ? _activeVehicle.cameraTriggerPoints.count !== 0 : false))
+    property bool _aerokontikiGuidedMissionActive:  missionController ? missionController.aerokontikiGuidedLaunchActive : false
+    property bool _vehicleWasInAerokontikiMission:  false
+    property bool _showMissionCompleteDialog:       _vehicleWasArmed && _vehicleWasFlying &&
+                                                         (_vehicleWasInMissionFlightMode || _vehicleWasInAerokontikiMission) &&
+                                                         (missionController.containsItems || geoFenceController.containsItems || rallyPointController.containsItems ||
+                                                         (_activeVehicle ? _activeVehicle.cameraTriggerPoints.count !== 0 : false))
 
     on_VehicleArmedChanged: {
         if (_vehicleArmed) {
             _vehicleWasArmed = true
+            _vehicleWasFlying = _vehicleFlying
             _vehicleWasInMissionFlightMode = _vehicleInMissionFlightMode
+            _vehicleWasInAerokontikiMission = _aerokontikiGuidedMissionActive
         } else {
             if (_showMissionCompleteDialog) {
-                _planController.removeAllFromVehicle()
+                _planController.removeAllFromVehicle() // Clears app-side storage for Aerokontiki controllers
                 backend.dropPointSelected = false
                 //hideDialog()
                 //mainWindow.showComponentDialog(missionCompleteDialogComponent, qsTr("Flight Plan complete"), mainWindow.showDialogDefaultWidth, StandardButton.Close)
             }
             _vehicleWasArmed = false
+            _vehicleWasFlying = false
             _vehicleWasInMissionFlightMode = false
+            _vehicleWasInAerokontikiMission = false
+        }
+    }
+
+    on_VehicleFlyingChanged: {
+        if (_vehicleFlying && _vehicleArmed) {
+            _vehicleWasFlying = true
         }
     }
 
     on_VehicleInMissionFlightModeChanged: {
         if (_vehicleInMissionFlightMode && _vehicleArmed) {
             _vehicleWasInMissionFlightMode = true
+        }
+    }
+
+    on_AerokontikiGuidedMissionActiveChanged: {
+        if (_aerokontikiGuidedMissionActive && _vehicleArmed) {
+            _vehicleWasInAerokontikiMission = true
         }
     }
 
@@ -91,7 +112,7 @@ Item {
 
                     QGCButton {
                         Layout.fillWidth:   true
-                        text:               qsTr("Remove plan from vehicle")
+                        text:               qsTr("Clear prepared mission")
                         visible:            !_activeVehicle.communicationLost// && !_activeVehicle.apmFirmware  // ArduPilot has a bug somewhere with mission clear
 
                         onClicked: {
@@ -99,13 +120,6 @@ Item {
                             backend.dropPointSelected = false
                             hideDialog()
                         }
-                    }
-
-                    QGCButton {
-                        Layout.fillWidth:   true
-                        Layout.alignment:   Qt.AlignHCenter
-                        text:               qsTr("Leave plan on vehicle")
-                        onClicked:          hideDialog()
                     }
 
                     Rectangle {

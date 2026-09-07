@@ -30,6 +30,14 @@ ApplicationWindow {
     minimumHeight:  ScreenTools.isMobile ? Screen.height : Math.min(ScreenTools.defaultFontPixelWidth * 50, Screen.height)
     visible:        true
 
+    Audio {
+        source:     "qrc:/res/audio/Welcome.mp3"
+        autoLoad:   true
+        autoPlay:   true
+        volume:     1.0
+        muted:      QGroundControl.settingsManager.appSettings.audioMuted.rawValue
+    }
+
 
     // Item {
     //     id: audioPlayer
@@ -103,6 +111,7 @@ ApplicationWindow {
 
         property var vehicle: QGroundControl.multiVehicleManager.activeVehicle
         property var oldServo9: 0
+        property double lastGuidedDropTimestamp: 0
 
         // --- helpers ---
         function deg2rad(deg) {
@@ -189,7 +198,7 @@ ApplicationWindow {
                             servo1Sound.play()
                         }
 
-                        if (allowTrigger) {
+                        if (allowTrigger && Date.now() - audioPlayer.lastGuidedDropTimestamp > 5000) {
                             console.log("WORKED! edge into window (30m+ from home)")
 
                             if (audioPlayer.vehicle.flying) {
@@ -203,12 +212,25 @@ ApplicationWindow {
                                             currentCoordinate.longitude)
                             }
                         } else {
-                            console.log("[drop] ignored: too close to home")
+                            console.log("[drop] ignored: duplicate event or too close to home")
                         }
                     }
 
                     audioPlayer.oldServo9 = pwm
                 }
+            }
+        }
+    }
+
+    Connections {
+        target: globals.planMasterControllerFlyView ? globals.planMasterControllerFlyView.missionController : null
+        ignoreUnknownSignals: true
+
+        function onAerokontikiBaitDropCommandSent(coordinate) {
+            if (coordinate && coordinate.isValid) {
+                audioPlayer.lastGuidedDropTimestamp = Date.now()
+                backend.addDropPoint("Point", coordinate.latitude, coordinate.longitude)
+                console.log("[drop] saved guided drop point at", coordinate.latitude, coordinate.longitude)
             }
         }
     }

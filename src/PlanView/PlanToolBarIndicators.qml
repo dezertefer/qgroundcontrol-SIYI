@@ -24,7 +24,6 @@ Item {
 
     property bool   _controllerValid:           _planMasterController !== undefined && _planMasterController !== null
     property bool   _controllerOffline:         _controllerValid ? _planMasterController.offline : true
-    property var    _controllerDirty:           _controllerValid ? _planMasterController.dirty : false
 
     property bool   _currentMissionItemValid:   _currentMissionItem && _currentMissionItem !== undefined && _currentMissionItem !== null
     property bool   _curreItemIsFlyThrough:     _currentMissionItemValid && _currentMissionItem.specifiesCoordinate && !_currentMissionItem.isStandaloneCoordinate
@@ -64,12 +63,10 @@ Item {
     property string _batteryChangePointText:    _batteryChangePoint < 0 ?       qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText:     _batteriesRequired < 0 ?        qsTr("N/A") : _batteriesRequired
 
-    property real   _KEK :                      QGroundControl.unitsConversion.metersToAppSettingsHorizontalDistanceUnits(_missionMaxTelemetry).toFixed(2)
-
-    property bool   _uploadSucceeded:        _controllerValid ? _planMasterController.missionController.uploadSucceeded : false
-    property bool   _uploadFailed:           _controllerValid ? _planMasterController.missionController.uploadFailed : false
-    property string _uploadErrorString:      _controllerValid ? _planMasterController.missionController.uploadErrorString : ""
-
+    readonly property real _launchAllowanceMeters:  2.0
+    property real   _winchLengthMeters:         _controllerValid ? Number(QGroundControl.settingsManager.planViewSettings.currentProfileWinchLength.rawValue) : NaN
+    property bool   _withinWinchLimit:           !isNaN(_missionMaxTelemetry) && !isNaN(_winchLengthMeters) &&
+                                                  _missionMaxTelemetry <= _winchLengthMeters + _launchAllowanceMeters
 
     readonly property real _margins: ScreenTools.defaultFontPixelWidth
 
@@ -100,74 +97,11 @@ Item {
         onSyncInProgressChanged: {
             if (_controllerSyncInProgress) {
                 missionStats.visible = true
-                uploadCompleteText.visible = false
-                uploadErrorText.visible = false
                 progressBar.visible = _controllerProgressPct > 0
             } else {
                 progressBar.visible = false
             }
         }
-
-        onUploadSucceededChanged: {
-            if (_uploadSucceeded) {
-                missionStats.visible = false
-                uploadErrorText.visible = false
-                uploadCompleteText.visible = true
-                progressBar.visible = false
-                resetProgressTimer.restart()
-            }
-        }
-
-        onUploadFailedChanged: {
-            if (_uploadFailed) {
-                missionStats.visible = false
-                uploadCompleteText.visible = false
-                uploadErrorText.visible = true
-                progressBar.visible = false
-                resetErrorTimer.restart()
-            }
-        }
-    }
-
-    Timer {
-        id:       resetProgressTimer
-        interval: 3000
-        repeat:   false
-        onTriggered: {
-            missionStats.visible = true
-            uploadCompleteText.visible = false
-        }
-    }
-
-    Timer {
-        id:       resetErrorTimer
-        interval: 4000
-        repeat:   false
-        onTriggered: {
-            missionStats.visible = true
-            uploadErrorText.visible = false
-        }
-    }
-
-    QGCLabel {
-        id:                     uploadCompleteText
-        anchors.fill:           parent
-        font.pointSize:         ScreenTools.largeFontPointSize
-        horizontalAlignment:    Text.AlignHCenter
-        verticalAlignment:      Text.AlignVCenter
-        text:                   qsTr("Upload complete")
-        visible:                false
-    }
-
-    QGCLabel {
-        id:                     uploadErrorText
-        anchors.fill:           parent
-        font.pointSize:         ScreenTools.largeFontPointSize
-        horizontalAlignment:    Text.AlignHCenter
-        verticalAlignment:      Text.AlignVCenter
-        color:                  "red"
-        text:                   _uploadErrorString !== "" ? _uploadErrorString : qsTr("Upload failed")
-        visible:                false
     }
 
     GridLayout {
@@ -313,37 +247,13 @@ Item {
             Item { width: 1; height: 1 }
         }
 
-        QGCButton {
-            id:          uploadButton
-            text:        _uploadFailed
-                            ? qsTr("Upload Failed - Retry")
-                            : (_controllerDirty ? qsTr("Upload Required") : qsTr("Upload"))
-            enabled:     _KEK < 2000 && !_controllerSyncInProgress
-            visible:     !_controllerOffline
-                         && !_controllerSyncInProgress
-                         && !uploadCompleteText.visible
-                         && (_controllerDirty || _uploadFailed)
-            primary:     _controllerDirty || _uploadFailed
-
-            onClicked: {
-                _planMasterController.upload()
-            }
-
-            PropertyAnimation on opacity {
-                easing.type:    Easing.OutQuart
-                from:           0.5
-                to:             1
-                loops:          Animation.Infinite
-                running:        (_controllerDirty || _uploadFailed) && !_controllerSyncInProgress
-                alwaysRunToEnd: true
-                duration:       2000
-            }
-        }
-
         QGCLabel
         {
-            text: _KEK<2000 ? "" : " Drop point is too far!"
+            text: _controllerValid && _planMasterController.containsItems && !_withinWinchLimit
+                    ? qsTr("Drop point exceeds winch length!")
+                    : ""
             color: "red"
+            Layout.columnSpan: 4
         }
     }
 

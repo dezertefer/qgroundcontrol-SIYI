@@ -429,6 +429,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 #
 
 HEADERS += \
+    src/MissionManager/AerokontikiMissionStore.h \
     src/PlanView/backend.h \
     src/QmlControls/QmlUnitsConversion.h \
     src/Settings/GeoserverSettings.h \
@@ -850,6 +851,7 @@ SOURCES += \
     src/KMLHelper.cc \
     src/LogCompressor.cc \
     src/MissionManager/CameraCalc.cc \
+    src/MissionManager/AerokontikiMissionStore.cc \
     src/MissionManager/CameraSection.cc \
     src/MissionManager/CameraSpec.cc \
     src/MissionManager/ComplexMissionItem.cc \

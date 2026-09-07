@@ -10,7 +10,7 @@
 
     <supports-screens android:largeScreens="true" android:normalScreens="true" android:anyDensity="true" android:smallScreens="true"/>
     <application android:hardwareAccelerated="true" android:name="org.qtproject.qt5.android.bindings.QtApplication" android:label="FishMaps" android:extractNativeLibs="true" android:icon="@drawable/icon">
-        <activity android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density" android:name="org.mavlink.qgroundcontrol.QGCActivity" android:label="FishMaps" android:screenOrientation="sensorLandscape" android:launchMode="singleTask" android:keepScreenOn="true">
+        <activity android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density" android:name="org.mavlink.qgroundcontrol.QGCActivity" android:label="FishMaps" android:screenOrientation="sensorLandscape" android:launchMode="singleTask" android:keepScreenOn="true" android:theme="@style/FishMapsTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -53,8 +53,8 @@
                  use hideSplashScreen() with a fade-out animation from Qt Android Extras to hide the splash screen when you
                  are done populating your window with content. -->
             <!-- meta-data android:name="android.app.splash_screen_drawable_portrait" android:resource="@drawable/logo_portrait" / -->
-            <!-- meta-data android:name="android.app.splash_screen_drawable_landscape" android:resource="@drawable/logo_landscape" / -->
-            <!-- meta-data android:name="android.app.splash_screen_drawable" android:resource="@drawable/logo"/ -->
+            <meta-data android:name="android.app.splash_screen_drawable_landscape" android:resource="@drawable/fishmaps_splash_landscape"/>
+            <meta-data android:name="android.app.splash_screen_drawable" android:resource="@drawable/fishmaps_splash_landscape"/>
             <!-- meta-data android:name="android.app.splash_screen_sticky" android:value="true"/ -->
             <!-- Splash screen -->
             <!-- Background running -->
@@ -77,6 +77,14 @@
             <meta-data android:name="android.app.extract_android_style" android:value="default"/>
             <!-- extract android style -->
         </activity>
+        <receiver android:name="org.mavlink.qgroundcontrol.BootReceiver" android:enabled="true" android:exported="true" android:directBootAware="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </receiver>
         <!-- For adding service(s) please check: https://wiki.qt.io/AndroidServices -->
     </application>
 
@@ -84,6 +92,9 @@
 
     <!-- Needed to keep working while 'asleep' -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Start FishMaps after Android boots while retaining the stock launcher. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <!-- Need MulticastLock to receive broadcast UDP packets  -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>

@@ -300,23 +300,13 @@ FlightMap {
         }
     }
 
-    // Add the items associated with each vehicles flight plan to the map
-    Repeater {
-        model: QGroundControl.multiVehicleManager.vehicles
-
-        PlanMapItems {
-            map:                    _root
-            largeMapView:           !pipMode
-            planMasterController:   masterController
-            vehicle:                _vehicle
-
-            property var _vehicle: object
-
-            PlanMasterController {
-                id: masterController
-                Component.onCompleted: startStaticActiveVehicle(object)
-            }
-        }
+    // FishMaps owns one app-side guided mission for the active vehicle.
+    PlanMapItems {
+        map:                    _root
+        largeMapView:           !pipMode
+        planMasterController:   _planMasterController
+        vehicle:                _activeVehicle
+        visible:                _activeVehicle !== null
     }
 
     MapItemView {

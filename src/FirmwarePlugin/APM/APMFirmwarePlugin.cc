@@ -835,15 +835,29 @@ void APMFirmwarePlugin::guidedModeTakeoff(Vehicle* vehicle, double altitudeRel)
 
 double APMFirmwarePlugin::minimumTakeoffAltitude(Vehicle* vehicle)
 {
-    double minTakeoffAlt = 0;
-    QString takeoffAltParam(vehicle->vtol() ? QStringLiteral("Q_RTL_ALT") : QStringLiteral("PILOT_TKOFF_ALT"));
-    float paramDivisor = vehicle->vtol() ? 1.0 : 100.0; // PILOT_TAKEOFF_ALT is in centimeters
+    double minTakeoffAlt = 0.0;
+    ParameterManager* parameterManager = vehicle->parameterManager();
+    const int componentId = FactSystem::defaultComponentId;
 
-    if (vehicle->parameterManager()->parameterExists(FactSystem::defaultComponentId, takeoffAltParam)) {
-        minTakeoffAlt = vehicle->parameterManager()->getParameter(FactSystem::defaultComponentId, takeoffAltParam)->rawValue().toDouble() / static_cast<double>(paramDivisor);
+    if (vehicle->vtol()) {
+        if (parameterManager->parameterExists(componentId, QStringLiteral("Q_PILOT_TKO_ALT_M"))) {
+            // ArduPilot 4.7+: value is in metres.
+            minTakeoffAlt = parameterManager->getParameter(componentId, QStringLiteral("Q_PILOT_TKO_ALT_M"))->rawValue().toDouble();
+        } else if (parameterManager->parameterExists(componentId, QStringLiteral("Q_PILOT_TKOFF_ALT"))) {
+            // Older ArduPilot versions store this value in centimetres.
+            minTakeoffAlt = parameterManager->getParameter(componentId, QStringLiteral("Q_PILOT_TKOFF_ALT"))->rawValue().toDouble() / 100.0;
+        } else if (parameterManager->parameterExists(componentId, QStringLiteral("Q_RTL_ALT"))) {
+            minTakeoffAlt = parameterManager->getParameter(componentId, QStringLiteral("Q_RTL_ALT"))->rawValue().toDouble();
+        }
+    } else if (parameterManager->parameterExists(componentId, QStringLiteral("PILOT_TKO_ALT_M"))) {
+        // ArduPilot 4.7+: value is in metres.
+        minTakeoffAlt = parameterManager->getParameter(componentId, QStringLiteral("PILOT_TKO_ALT_M"))->rawValue().toDouble();
+    } else if (parameterManager->parameterExists(componentId, QStringLiteral("PILOT_TKOFF_ALT"))) {
+        // Older ArduPilot versions store this value in centimetres.
+        minTakeoffAlt = parameterManager->getParameter(componentId, QStringLiteral("PILOT_TKOFF_ALT"))->rawValue().toDouble() / 100.0;
     }
 
-    if (minTakeoffAlt == 0) {
+    if (minTakeoffAlt <= 0.0 || qIsNaN(minTakeoffAlt)) {
         minTakeoffAlt = FirmwarePlugin::minimumTakeoffAltitude(vehicle);
     }
 

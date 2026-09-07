@@ -303,23 +303,12 @@ void InitialConnectStateMachine::_stateRequestMission(StateMachine* stateMachine
 {
     InitialConnectStateMachine* connectMachine  = static_cast<InitialConnectStateMachine*>(stateMachine);
     Vehicle*                    vehicle         = connectMachine->_vehicle;
-    SharedLinkInterfacePtr      sharedLink      = vehicle->vehicleLinkManager()->primaryLink().lock();
 
     disconnect(vehicle->_parameterManager, &ParameterManager::loadProgressChanged, connectMachine,
             &InitialConnectStateMachine::gotProgressUpdate);
 
-    if (!sharedLink) {
-        qCDebug(InitialConnectStateMachineLog) << "_stateRequestMission: Skipping first mission load request due to no primary link";
-        connectMachine->advance();
-    } else {
-        if (sharedLink->linkConfiguration()->isHighLatency() || sharedLink->isPX4Flow() || sharedLink->isLogReplay()) {
-            qCDebug(InitialConnectStateMachineLog) << "_stateRequestMission: Skipping first mission load request due to link type";
-            vehicle->_firstMissionLoadComplete();
-        } else {
-            qCDebug(InitialConnectStateMachineLog) << "_stateRequestMission";
-            vehicle->_missionManager->loadFromVehicle();
-        }
-    }
+    qCDebug(InitialConnectStateMachineLog) << "_stateRequestMission: onboard mission download disabled; using app-side Aerokontiki storage";
+    vehicle->_firstMissionLoadComplete();
 }
 
 void InitialConnectStateMachine::_stateRequestGeoFence(StateMachine* stateMachine)

@@ -37,6 +37,7 @@ public:
 
     Q_PROPERTY(bool                     flyView                 MEMBER _flyView)
     Q_PROPERTY(bool                     aerokontikiControl      MEMBER _aerokontikiControl)
+    Q_PROPERTY(bool                     aerokontikiMissionStorage MEMBER _aerokontikiMissionStorage)
     Q_PROPERTY(Vehicle*                 controllerVehicle       READ controllerVehicle                      CONSTANT)                       ///< Offline controller vehicle
     Q_PROPERTY(Vehicle*                 managerVehicle          READ managerVehicle                         NOTIFY managerVehicleChanged)   ///< Either active vehicle or _controllerVehicle if no active vehicle
     Q_PROPERTY(MissionController*       missionController       READ missionController                      CONSTANT)
@@ -102,6 +103,7 @@ public:
 
     void        setFlyView(bool flyView) { _flyView = flyView; }
     bool        aerokontikiControl(void) const { return _aerokontikiControl; }
+    bool        aerokontikiMissionStorage(void) const { return _aerokontikiMissionStorage; }
 
     QJsonDocument saveToJson    ();
 
@@ -146,6 +148,7 @@ private:
     Vehicle*                _managerVehicle =           nullptr;    ///< Either active vehicle or _controllerVehicle if none
     bool                    _flyView =                  true;
     bool                    _aerokontikiControl =       false;
+    bool                    _aerokontikiMissionStorage = false;
     bool                    _offline =                  true;
     MissionController       _missionController;
     GeoFenceController      _geoFenceController;

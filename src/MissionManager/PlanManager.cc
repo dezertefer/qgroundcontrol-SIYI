@@ -64,6 +64,13 @@ void PlanManager::_writeMissionItemsWorker(void)
 
 void PlanManager::writeMissionItems(const QList<MissionItem*>& missionItems)
 {
+    if (_planType == MAV_MISSION_TYPE_MISSION) {
+        qCWarning(PlanManagerLog) << "Vehicle mission upload blocked: FishMaps uses app-side guided missions";
+        qDeleteAll(missionItems);
+        emit sendComplete(true);
+        return;
+    }
+
     if (_vehicle->isOfflineEditingVehicle()) {
         return;
     }
@@ -123,6 +130,13 @@ void PlanManager::_writeMissionCount(void)
 
 void PlanManager::loadFromVehicle(void)
 {
+    if (_planType == MAV_MISSION_TYPE_MISSION) {
+        qCWarning(PlanManagerLog) << "Vehicle mission download blocked: FishMaps uses app-side guided missions";
+        _clearMissionItems();
+        emit newMissionItemsAvailable(false);
+        return;
+    }
+
     if (_vehicle->isOfflineEditingVehicle()) {
         return;
     }
@@ -884,6 +898,17 @@ void PlanManager::_removeAllWorker(void)
 
 void PlanManager::removeAll(void)
 {
+    if (_planType == MAV_MISSION_TYPE_MISSION) {
+        qCWarning(PlanManagerLog) << "Vehicle mission clear blocked: FishMaps only clears its app-side mission";
+        _clearMissionItems();
+        _currentMissionIndex = -1;
+        _lastCurrentIndex = -1;
+        emit currentIndexChanged(-1);
+        emit lastCurrentIndexChanged(-1);
+        emit removeAllComplete(true);
+        return;
+    }
+
     if (inProgress()) {
         return;
     }

@@ -73,8 +73,6 @@ Item {
     readonly property int       _layerMission:              1
     readonly property int       _layerGeoFence:             2
     readonly property int       _layerRallyPoints:          3
-    readonly property string    _armedVehicleUploadPrompt:  qsTr("Vehicle is currently armed. Do you want to upload the mission to the vehicle?")
-
     property var _pendingCoord: null
 
     property bool enableDebug: false
@@ -273,21 +271,6 @@ Item {
     }
 
 
-    Component {
-        id: firmwareOrVehicleMismatchUploadDialogComponent
-        QGCViewMessage {
-            message: qsTr("This Plan was created for a different firmware or vehicle type than the firmware/vehicle type of vehicle you are uploading to. " +
-                            "This can lead to errors or incorrect behavior. " +
-                            "It is recommended to recreate the Plan for the correct firmware/vehicle type.\n\n" +
-                            "Click 'Ok' to upload the Plan anyway.")
-
-            function accept() {
-                _planMasterController.sendToVehicle()
-                hideDialog()
-            }
-        }
-    }
-
     Connections {
         target: QGroundControl.airspaceManager
         function onAirspaceVisibleChanged() {
@@ -305,8 +288,9 @@ Item {
 
 
     PlanMasterController {
-        id:         _planMasterController
-        flyView:    false
+        id:                         _planMasterController
+        flyView:                    false
+        aerokontikiMissionStorage:  true
 
         Component.onCompleted: {
             _planMasterController.start()
@@ -321,43 +305,23 @@ Item {
             }
         }
 
-        function waitingOnIncompleteDataMessage(save) {
-            var saveOrUpload = save ? qsTr("Save") : qsTr("Upload")
-            mainWindow.showMessageDialog(qsTr("Unable to %1").arg(saveOrUpload), qsTr("Plan has incomplete items. Complete all items and %1 again.").arg(saveOrUpload))
+        function waitingOnIncompleteDataMessage() {
+            mainWindow.showMessageDialog(qsTr("Unable to Save"), qsTr("Plan has incomplete items. Complete all items and save again."))
         }
 
-        function waitingOnTerrainDataMessage(save) {
-            var saveOrUpload = save ? qsTr("Save") : qsTr("Upload")
-            mainWindow.showMessageDialog(qsTr("Unable to %1").arg(saveOrUpload), qsTr("Plan is waiting on terrain data from server for correct altitude values."))
+        function waitingOnTerrainDataMessage() {
+            mainWindow.showMessageDialog(qsTr("Unable to Save"), qsTr("Plan is waiting on terrain data from server for correct altitude values."))
         }
 
-        function checkReadyForSaveUpload(save) {
+        function checkReadyForSave() {
             if (readyForSaveState() == VisualMissionItem.NotReadyForSaveData) {
-                waitingOnIncompleteDataMessage(save)
+                waitingOnIncompleteDataMessage()
                 return false
             } else if (readyForSaveState() == VisualMissionItem.NotReadyForSaveTerrain) {
                 //waitingOnTerrainDataMessage(save)
                 //return false
             }
             return true
-        }
-
-        function upload() {
-            if (!checkReadyForSaveUpload(false /* save */)) {
-                return
-            }
-            switch (_missionController.sendToVehiclePreCheck()) {
-                case MissionController.SendToVehiclePreCheckStateOk:
-                    //backend.addDropPoint("Point", globals.pointToAdd.lat, globals.pointToAdd.lon)
-                    sendToVehicle()
-                    break
-                case MissionController.SendToVehiclePreCheckStateActiveMission:
-                    mainWindow.showMessageDialog(qsTr("Send To Vehicle"), qsTr("Current mission must be paused prior to uploading a new Plan"))
-                    break
-                case MissionController.SendToVehiclePreCheckStateFirwmareVehicleMismatch:
-                    mainWindow.showComponentDialog(firmwareOrVehicleMismatchUploadDialogComponent, qsTr("Plan Upload"), mainWindow.showDialogDefaultWidth, StandardButton.Ok | StandardButton.Cancel)
-                    break
-            }
         }
 
         function loadFromSelectedFile() {
@@ -369,7 +333,7 @@ Item {
         }
 
         function saveToSelectedFile() {
-            if (!checkReadyForSaveUpload(true /* save */)) {
+            if (!checkReadyForSave()) {
                 return
             }
             fileDialog.title =          qsTr("Save Plan")
@@ -384,7 +348,7 @@ Item {
         }
 
         function saveKmlToSelectedFile() {
-            if (!checkReadyForSaveUpload(true /* save */)) {
+            if (!checkReadyForSave()) {
                 return
             }
             fileDialog.title =          qsTr("Save KML")
@@ -404,6 +368,7 @@ Item {
             }
             _missionController.setCurrentPlanViewSeqNum(0, true)
         }
+
     }
 
     /*BackEnd {
@@ -1314,11 +1279,10 @@ Item {
         // Left tool strip
         ToolStrip {
             id:                 toolStrip
-            anchors.margins:    _toolsMargin/3
             anchors.left:       parent.left
             anchors.top:        parent.top
             z:                  QGroundControl.zOrderWidgets
-            maxHeight:          (parent.height - y) / scaleFactor - _toolsMargin/3
+            maxHeight:          (parent.height - y) / scaleFactor
             title:              qsTr("Plan")
 
 
@@ -1453,9 +1417,6 @@ Item {
                         visible:            true
                         onTriggered:{
                             mainWindow.showComponentDialog(clearVehicleMissionDialog, text, mainWindow.showDialogDefaultWidth, StandardButton.Yes | StandardButton.Cancel)
-                            //QGroundControl.settingsManager.planViewSettings.dropPointSelected.setRawValue(false)
-                            //dropPointSelected = false
-                            backend.dropPointSelected = false
                         }
                     }
 
@@ -1689,18 +1650,6 @@ Item {
 
 
     Component {
-        id: syncLoadFromVehicleOverwrite
-        QGCViewMessage {
-            id:         syncLoadFromVehicleCheck
-            message:   qsTr("You have unsaved/unsent changes. Loading from the Vehicle will lose these changes. Are you sure you want to load from the Vehicle?")
-            function accept() {
-                hideDialog()
-                _planMasterController.loadFromVehicle()
-            }
-        }
-    }
-
-    Component {
         id: syncLoadFromFileOverwrite
         QGCViewMessage {
             id:         syncLoadFromVehicleCheck
@@ -1728,10 +1677,11 @@ Item {
     Component {
         id: clearVehicleMissionDialog
         QGCViewMessage {
-            message: qsTr("Are you sure you want to remove all mission items and clear the mission from the vehicle?")
+            message: qsTr("Are you sure you want to clear the prepared mission from this app?")
             function accept() {
                 _planMasterController.removeAllFromVehicle()
                 _missionController.setCurrentPlanViewSeqNum(0, true)
+                backend.dropPointSelected = false
                 hideDialog()
             }
         }
@@ -1836,9 +1786,7 @@ Item {
                         id:                 unsavedChangedLabel
                         wrapMode:           Text.WordWrap
                         Layout.preferredWidth: _valueFieldWidth*2
-                        text:               globals.activeVehicle ?
-                                                qsTr("You have unsaved changes. You should upload to your vehicle, or save to a file.") :
-                                                qsTr("You have unsaved changes.")
+                        text:               qsTr("You have unsaved changes.")
                         visible:            _planMasterController.dirty
                     }
 
@@ -1950,9 +1898,17 @@ Item {
                         }
                         FactTextField {
                             id: newCableLengthFactTextField
-                            fact: _planViewSettings.currentProfileCableLength
+                            fact: _planViewSettings.newProfileCableLength
                             Layout.preferredWidth:  _valueFieldWidth
                             visible: _isNew
+                        }
+
+                        QGCLabel { text: qsTr("Winch:") }
+                        FactTextField {
+                            fact: _isNew ? _planViewSettings.newProfileWinchLength
+                                         : _planViewSettings.currentProfileWinchLength
+                            Layout.preferredWidth: _valueFieldWidth
+                            enabled: _isNew || _isEdit
                         }
 
                         QGCLabel { text: qsTr("Haul Altitude:") }
@@ -2081,67 +2037,6 @@ Item {
                         visible:            storageSection.visible
                     }
 
-                    SectionHeader {
-                        id:                 vehicleSection
-                        Layout.fillWidth:   true
-                        text:               qsTr("Mission")
-                    }
-
-                    GridLayout {
-                        Layout.fillWidth:   true
-                        rowSpacing:         _margin
-                        columns:            2
-                        visible:            vehicleSection.visible
-
-                        QGCButton {
-                            text:               qsTr("Upload")
-                            Layout.fillWidth:   true
-                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress && _planMasterController.containsItems
-                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                            onClicked: {
-                                dropPanel.hide()
-                                _planMasterController.upload()
-                            }
-                        }
-
-                        QGCButton {
-                            text:               qsTr("Download")
-                            Layout.fillWidth:   true
-                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
-                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                            onClicked: {
-                                dropPanel.hide()
-                                if (_planMasterController.dirty) {
-                                    mainWindow.showComponentDialog(
-                                        syncLoadFromVehicleOverwrite,
-                                        columnHolder._overwriteText,
-                                        mainWindow.showDialogDefaultWidth,
-                                        StandardButton.Yes | StandardButton.Cancel
-                                    )
-                                } else {
-                                    _planMasterController.loadFromVehicle()
-                                }
-                            }
-                        }
-
-                        QGCButton {
-                            text:               qsTr("Clear")
-                            Layout.fillWidth:   true
-                            Layout.columnSpan:  2
-                            enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
-                            visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
-                            onClicked: {
-                                dropPanel.hide()
-                                mainWindow.showComponentDialog(
-                                    clearVehicleMissionDialog,
-                                    text,
-                                    mainWindow.showDialogDefaultWidth,
-                                    StandardButton.Yes | StandardButton.Cancel
-                                )
-                                backend.dropPointSelected = false
-                            }
-                        }
-                    }
                 } // ColumnLayout
             } // QGCFlickable
         } // Item

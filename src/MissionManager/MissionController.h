@@ -120,6 +120,7 @@ public:
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchPaused   READ aerokontikiGuidedLaunchPaused  NOTIFY aerokontikiGuidedLaunchPausedChanged)
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchAvailable READ aerokontikiGuidedLaunchAvailable NOTIFY aerokontikiGuidedLaunchAvailableChanged)
     Q_PROPERTY(double               aerokontikiGuidedLaunchSpeed    READ aerokontikiGuidedLaunchSpeed   WRITE setAerokontikiGuidedLaunchSpeed NOTIFY aerokontikiGuidedLaunchSpeedChanged)
+    Q_PROPERTY(double               aerokontikiGuidedLaunchProfileSpeed READ aerokontikiGuidedLaunchProfileSpeed NOTIFY aerokontikiGuidedLaunchSpeedChanged)
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchHaulPhase READ aerokontikiGuidedLaunchHaulPhase NOTIFY aerokontikiGuidedLaunchHaulPhaseChanged)
 
 
@@ -201,6 +202,9 @@ public:
     ///     @return true: the launch helper accepted/handled the start request
     Q_INVOKABLE bool startAerokontikiGuidedLaunch(void);
     Q_INVOKABLE bool toggleAerokontikiGuidedLaunchPause(void);
+    Q_INVOKABLE bool saveAerokontikiMissionToAppStorage(void);
+    Q_INVOKABLE bool loadAerokontikiMissionFromAppStorage(void);
+    Q_INVOKABLE bool clearAerokontikiMissionFromAppStorage(void);
 
     enum SendToVehiclePreCheckState {
         SendToVehiclePreCheckStateOk,                       // Ok to send plan to vehicle
@@ -248,6 +252,7 @@ public:
     bool aerokontikiGuidedLaunchPaused() const;
     bool aerokontikiGuidedLaunchAvailable() const;
     double aerokontikiGuidedLaunchSpeed() const;
+    double aerokontikiGuidedLaunchProfileSpeed() const;
     bool aerokontikiGuidedLaunchHaulPhase() const { return _aerokontikiHaulPhase; }
     Q_INVOKABLE void setAerokontikiGuidedLaunchSpeed(double speedMetersPerSecond);
 
@@ -349,6 +354,7 @@ signals:
     void aerokontikiGuidedLaunchAvailableChanged(void);
     void aerokontikiGuidedLaunchSpeedChanged(void);
     void aerokontikiGuidedLaunchHaulPhaseChanged(void);
+    void aerokontikiBaitDropCommandSent(QGeoCoordinate coordinate);
 
     void hasPositionChanged();
 
@@ -372,6 +378,7 @@ private slots:
     void _aerokontikiGuidedLaunchTick           (void);
     void _aerokontikiFlightModeTick             (void);
     void _aerokontikiMavlinkMessageReceived     (const mavlink_message_t& message);
+    void _aerokontikiStoredMissionChanged       (void);
 
 private:
     void                    _init                               (void);
@@ -420,8 +427,11 @@ private:
 
     struct AerokontikiLaunchPlan_t {
         bool                                valid =                 false;
+        QGeoCoordinate                      launchCoordinate;
         double                              takeoffAltitude =       qQNaN();
         double                              missionAltitude =       qQNaN();
+        double                              takeoffSpeed =          qQNaN();
+        double                              haulSpeed =             qQNaN();
         QList<AerokontikiGuidedWaypoint_t>  waypoints;
         int                                 haulTransitionIndex =   -1;
         double                              servoParam1 =           0.0;
@@ -435,12 +445,14 @@ private:
     };
 
     AerokontikiLaunchPlan_t _aerokontikiLaunchPlan              (void) const;
+    bool                    _aerokontikiLiveLaunchPositionValid (const AerokontikiLaunchPlan_t& launchPlan, double* distanceMeters = nullptr) const;
     bool                    _aerokontikiModeIsManual            (Vehicle* vehicle, const QString& flightMode) const;
     bool                    _aerokontikiModeIsAutoControl       (Vehicle* vehicle, const QString& flightMode) const;
     bool                    _aerokontikiModeIsRtl               (Vehicle* vehicle, const QString& flightMode) const;
     void                    _pauseAerokontikiGuidedLaunch       (void);
     void                    _resumeAerokontikiGuidedLaunch      (void);
     void                    _setAerokontikiHaulPhase            (bool haulPhase);
+    void                    _scheduleAerokontikiMissionAutoSave (void);
     double                  _clampedAerokontikiGuidedLaunchSpeed(double speedMetersPerSecond) const;
     void                    _sendAerokontikiGuidedHold          (void);
     void                    _sendAerokontikiGuidedVelocityTarget(const QGeoCoordinate& coordinate, double altitudeRelative, double speedMetersPerSecond);
@@ -510,6 +522,7 @@ private:
 
     QTimer                      _aerokontikiLaunchTimer;
     QTimer                      _aerokontikiFlightModeTimer;
+    QTimer                      _aerokontikiMissionAutoSaveTimer;
     QElapsedTimer               _aerokontikiLaunchElapsed;
     QPointer<Vehicle>           _aerokontikiLaunchVehicle;
     AerokontikiLaunchState      _aerokontikiLaunchState =       AerokontikiLaunchIdle;
@@ -523,7 +536,11 @@ private:
     bool                        _aerokontikiTakeoffCommandSent = false;
     bool                        _aerokontikiLaunchPaused =      false;
     bool                        _aerokontikiHaulPhase =         false;
+    bool                        _aerokontikiMissionAutoSaveEnabled = false;
     double                      _aerokontikiLaunchSpeed =       qQNaN();
+    double                      _aerokontikiStoredTakeoffSpeed = qQNaN();
+    double                      _aerokontikiStoredHaulSpeed =    qQNaN();
+    double                      _aerokontikiDescentYawDegrees = qQNaN();
     QElapsedTimer               _aerokontikiProgressElapsed;
     AerokontikiLaunchState      _aerokontikiProgressState =     AerokontikiLaunchIdle;
     double                      _aerokontikiProgressAltitude =  qQNaN();
@@ -533,6 +550,7 @@ private:
     bool                        _aerokontikiFreshPosition =     false;
     bool                        _aerokontikiReconnectValidationStarted = false;
     bool                        _aerokontikiServoCommandSent =   false;
+    bool                        _ignoreAerokontikiStoreChange = false;
     QElapsedTimer               _aerokontikiReconnectElapsed;
 
     QGroundControlQmlGlobal::AltMode _globalAltMode = QGroundControlQmlGlobal::AltitudeModeRelative;

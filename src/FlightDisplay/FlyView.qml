@@ -40,6 +40,7 @@ Item {
         id:                     _planController
         flyView:                true
         aerokontikiControl:     true
+        aerokontikiMissionStorage: true
         Component.onCompleted:  start()
     }
 

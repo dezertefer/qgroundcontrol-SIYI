@@ -147,10 +147,12 @@ void PlanMasterController::_activeVehicleChanged(Vehicle* activeVehicle)
         appSettings->offlineEditingVehicleClass()->setRawValue(QGCMAVLink::vehicleClass(_managerVehicle->vehicleType()));
 
         // We use these signals to sequence upload and download to the multiple controller/managers
-        connect(_managerVehicle->missionManager(),      &MissionManager::newMissionItemsAvailable,  this, &PlanMasterController::_loadMissionComplete);
+        if (!_aerokontikiMissionStorage) {
+            connect(_managerVehicle->missionManager(),  &MissionManager::newMissionItemsAvailable,  this, &PlanMasterController::_loadMissionComplete);
+            connect(_managerVehicle->missionManager(),  &MissionManager::sendComplete,              this, &PlanMasterController::_sendMissionComplete);
+        }
         connect(_managerVehicle->geoFenceManager(),     &GeoFenceManager::loadComplete,             this, &PlanMasterController::_loadGeoFenceComplete);
         connect(_managerVehicle->rallyPointManager(),   &RallyPointManager::loadComplete,           this, &PlanMasterController::_loadRallyPointsComplete);
-        connect(_managerVehicle->missionManager(),      &MissionManager::sendComplete,              this, &PlanMasterController::_sendMissionComplete);
         connect(_managerVehicle->geoFenceManager(),     &GeoFenceManager::sendComplete,             this, &PlanMasterController::_sendGeoFenceComplete);
         connect(_managerVehicle->rallyPointManager(),   &RallyPointManager::sendComplete,           this, &PlanMasterController::_sendRallyPointsComplete);
     }
@@ -159,7 +161,9 @@ void PlanMasterController::_activeVehicleChanged(Vehicle* activeVehicle)
     emit offlineChanged(offline());
     emit managerVehicleChanged(_managerVehicle);
 
-    if (_flyView) {
+    if (_aerokontikiMissionStorage) {
+        qCDebug(PlanMasterControllerLog) << "_activeVehicleChanged: keeping app-side Aerokontiki mission";
+    } else if (_flyView) {
         // We are in the Fly View
         if (newOffline) {
             // No active vehicle, clear mission
@@ -213,6 +217,11 @@ void PlanMasterController::_activeVehicleChanged(Vehicle* activeVehicle)
 
 void PlanMasterController::loadFromVehicle(void)
 {
+    if (_aerokontikiMissionStorage) {
+        qCWarning(PlanMasterControllerLog) << "Vehicle mission download is disabled for app-side Aerokontiki missions";
+        return;
+    }
+
     WeakLinkInterfacePtr weakLink = _managerVehicle->vehicleLinkManager()->primaryLink();
     if (weakLink.expired()) {
         // Vehicle is shutting down
@@ -327,6 +336,11 @@ void PlanMasterController::_startFlightPlanning(void) {
 
 void PlanMasterController::sendToVehicle(void)
 {
+    if (_aerokontikiMissionStorage) {
+        _missionController.saveAerokontikiMissionToAppStorage();
+        return;
+    }
+
     WeakLinkInterfacePtr weakLink = _managerVehicle->vehicleLinkManager()->primaryLink();
     if (weakLink.expired()) {
         // Vehicle is shutting down
@@ -541,6 +555,14 @@ void PlanMasterController::removeAll(void)
 
 void PlanMasterController::removeAllFromVehicle(void)
 {
+    if (_aerokontikiMissionStorage) {
+        if (_missionController.clearAerokontikiMissionFromAppStorage()) {
+            removeAll();
+            setDirty(false);
+        }
+        return;
+    }
+
     if (!offline()) {
         _missionController.removeAllFromVehicle();
         if (_geoFenceController.supported()) {
@@ -663,6 +685,11 @@ void PlanMasterController::_updatePlanCreatorsList(void)
 
 void PlanMasterController::showPlanFromManagerVehicle(void)
 {
+    if (_aerokontikiMissionStorage) {
+        _missionController.loadAerokontikiMissionFromAppStorage();
+        return;
+    }
+
     if (offline()) {
         // There is no new vehicle so clear any previous plan
         qCDebug(PlanMasterControllerLog) << "showPlanFromManagerVehicle: Plan View - No new vehicle, clear any previous plan";

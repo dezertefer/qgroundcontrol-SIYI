@@ -114,7 +114,8 @@ Item {
     property bool showRTL:              _guidedActionsEnabled && _vehicleArmed && _activeVehicle.guidedModeSupported && _vehicleFlying && !_vehicleInRTLMode
     property bool showTakeoff:          _guidedActionsEnabled && _activeVehicle.takeoffVehicleSupported && !_vehicleFlying && _canArm
     property bool showLand:             false
-    property bool showStartMission:     _guidedActionsEnabled && _missionAvailable && _aerokontikiGuidedLaunchAvailable && !_aerokontikiGuidedLaunchActive && !_missionActive && !_vehicleFlying && _canArm && _vehicleInGuidedMode
+    property bool showStartMissionAction: _guidedActionsEnabled && !_aerokontikiGuidedLaunchActive && !_missionActive && !_vehicleFlying && _canArm && _vehicleInGuidedMode
+    property bool showStartMission:     showStartMissionAction && _missionAvailable && _aerokontikiGuidedLaunchAvailable
     property bool showContinueMission:  false
     property bool showPause:            false
     property bool showChangeAlt:        _guidedActionsEnabled && _vehicleFlying && _activeVehicle.guidedModeSupported && _vehicleArmed && !_missionActive
@@ -122,10 +123,10 @@ Item {
     property bool showROI:              _guidedActionsEnabled && _vehicleFlying && __roiSupported && !_missionActive
     property bool showLandAbort:        _guidedActionsEnabled && _vehicleFlying && _fixedWingOnApproach
     property bool showGotoLocation:     _guidedActionsEnabled && _vehicleFlying
-    property bool showActionList:       _guidedActionsEnabled && !_vehicleFlying && showStartMission
+    property bool showActionList:       _guidedActionsEnabled && !_vehicleFlying && showStartMissionAction
 
     // Note: The '_missionItemCount - 2' is a hack to not trigger resume mission when a mission ends with an RTL item
-    property bool showResumeMission:    _activeVehicle && !_vehicleArmed && _vehicleWasFlying && _missionAvailable && _resumeMissionIndex > 0 && (_resumeMissionIndex < _missionItemCount - 2)
+    property bool showResumeMission:    false
 
     property bool guidedUIVisible:      confirmDialog.visible || actionList.visible
 
@@ -487,8 +488,8 @@ Item {
             missionController.resumeMission(missionController.resumeMissionIndex)
             break
         case actionStartMission:
-            if (!missionController || !missionController.startAerokontikiGuidedLaunch()) {
-                _activeVehicle.startMission()
+            if (missionController) {
+                missionController.startAerokontikiGuidedLaunch()
             }
             break
         case actionContinueMission:

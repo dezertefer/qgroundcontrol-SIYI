@@ -23,6 +23,7 @@ Slider {
     property bool zeroCentered: false
     property bool displayValue: false
     property bool indicatorBarVisible: true
+    property color indicatorColor: qgcPal.colorBlue
 
     style: SliderStyle {
         groove: Item {
@@ -53,7 +54,7 @@ Slider {
 
                 Rectangle {
                     anchors.fill:   parent
-                    color:          qgcPal.colorBlue
+                    color:          _root.indicatorColor
                     border.color:   Qt.darker(color, 1.2)
                     radius:         height/2
                 }
