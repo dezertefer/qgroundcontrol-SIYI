@@ -21,19 +21,33 @@ QGCTextField {
     property Fact   fact: null
 
     property string _validateString
+    property bool   _validationDialogActive: false
 
     inputMethodHints: ((fact && fact.typeIsString) || ScreenTools.isiOS) ?
                           Qt.ImhNone :                // iOS numeric keyboard has no done button, we can't use it
                           Qt.ImhFormattedNumbersOnly  // Forces use of virtual numeric keyboard
 
     onEditingFinished: {
+        if (!fact) {
+            return
+        }
+
         var errorString = fact.validate(text, false /* convertOnly */)
         if (errorString === "") {
             fact.value = text
             _textField.updated()
-        } else {
+        } else if (!_validationDialogActive) {
+            _validationDialogActive = true
             _validateString = text
-            mainWindow.showComponentDialog(validationErrorDialogComponent, qsTr("Invalid Value"), mainWindow.showDialogDefaultWidth, StandardButton.Save | StandardButton.Cancel)
+            var dialog = mainWindow.showComponentDialog(validationErrorDialogComponent, qsTr("Invalid Value"), mainWindow.showDialogDefaultWidth, StandardButton.Save | StandardButton.Cancel)
+            if (dialog) {
+                dialog.closed.connect(function() {
+                    dialog.destroy()
+                    Qt.callLater(function() { _validationDialogActive = false })
+                })
+            } else {
+                _validationDialogActive = false
+            }
         }
     }
 

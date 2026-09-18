@@ -119,6 +119,7 @@ public:
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchActive   READ aerokontikiGuidedLaunchActive  NOTIFY aerokontikiGuidedLaunchActiveChanged)
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchPaused   READ aerokontikiGuidedLaunchPaused  NOTIFY aerokontikiGuidedLaunchPausedChanged)
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchAvailable READ aerokontikiGuidedLaunchAvailable NOTIFY aerokontikiGuidedLaunchAvailableChanged)
+    Q_PROPERTY(bool                 aerokontikiMainLineExceeded     READ aerokontikiMainLineExceeded    NOTIFY aerokontikiGuidedLaunchAvailableChanged)
     Q_PROPERTY(double               aerokontikiGuidedLaunchSpeed    READ aerokontikiGuidedLaunchSpeed   WRITE setAerokontikiGuidedLaunchSpeed NOTIFY aerokontikiGuidedLaunchSpeedChanged)
     Q_PROPERTY(double               aerokontikiGuidedLaunchProfileSpeed READ aerokontikiGuidedLaunchProfileSpeed NOTIFY aerokontikiGuidedLaunchSpeedChanged)
     Q_PROPERTY(bool                 aerokontikiGuidedLaunchHaulPhase READ aerokontikiGuidedLaunchHaulPhase NOTIFY aerokontikiGuidedLaunchHaulPhaseChanged)
@@ -251,6 +252,7 @@ public:
     bool aerokontikiGuidedLaunchActive() const;
     bool aerokontikiGuidedLaunchPaused() const;
     bool aerokontikiGuidedLaunchAvailable() const;
+    bool aerokontikiMainLineExceeded() const;
     double aerokontikiGuidedLaunchSpeed() const;
     double aerokontikiGuidedLaunchProfileSpeed() const;
     bool aerokontikiGuidedLaunchHaulPhase() const { return _aerokontikiHaulPhase; }
@@ -430,6 +432,10 @@ private:
         QGeoCoordinate                      launchCoordinate;
         double                              takeoffAltitude =       qQNaN();
         double                              missionAltitude =       qQNaN();
+        double                              leaderLength =          qQNaN();
+        double                              maximumDistanceFromLaunch = qQNaN();
+        double                              mainLineLength =        qQNaN();
+        bool                                withinMainLineLimit =   false;
         double                              takeoffSpeed =          qQNaN();
         double                              haulSpeed =             qQNaN();
         QList<AerokontikiGuidedWaypoint_t>  waypoints;
@@ -458,6 +464,7 @@ private:
     void                    _sendAerokontikiGuidedVelocityTarget(const QGeoCoordinate& coordinate, double altitudeRelative, double speedMetersPerSecond);
     bool                    _sendAerokontikiServoCommand        (void);
     void                    _finishAerokontikiGuidedMission     (const QString& warning = QString());
+    bool                    _aerokontikiLeaderFullyExtended     (double altitudeRelative) const;
     bool                    _aerokontikiWaypointReached         (const AerokontikiGuidedWaypoint_t& waypoint, double distanceToTarget, double altitudeRelative) const;
     double                  _missionItemRelativeAltitude        (SimpleMissionItem* simpleItem) const;
 

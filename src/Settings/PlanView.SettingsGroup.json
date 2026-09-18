@@ -64,7 +64,7 @@
     "default":      5.0,
     "units":        "m/s",
     "min":          0.5,
-    "max":          12.0,
+    "max":          6.9444444444,
     "decimalPlaces":    1
 },
 {
@@ -89,12 +89,12 @@
 },
 {
     "name":         "currentProfileWinchLength",
-    "shortDesc":    "Profile winch length",
+    "shortDesc":    "Profile main line length",
     "type":         "double",
-    "default":      2000.0,
+    "default":      1000.0,
     "units":        "m",
     "min":          10.0,
-    "max":          3050.0,
+    "max":          2000.0,
     "decimalPlaces":    0
 },
 {
@@ -104,7 +104,7 @@
     "default":      5.0,
     "units":        "m/s",
     "min":          0.5,
-    "max":          12.0,
+    "max":          6.9444444444,
     "decimalPlaces":    1
 },
 {
@@ -130,7 +130,7 @@
     "default":      5.0,
     "units":        "m/s",
     "min":          0.5,
-    "max":          12.0,
+    "max":          6.9444444444,
     "decimalPlaces":    1
 },
 {
@@ -155,12 +155,12 @@
 },
 {
     "name":         "newProfileWinchLength",
-    "shortDesc":    "Profile winch length",
+    "shortDesc":    "Profile main line length",
     "type":         "double",
     "default":      2000.0,
     "units":        "m",
     "min":          10.0,
-    "max":          3050.0,
+    "max":          3500.0,
     "decimalPlaces":    0
 },
 {
@@ -170,7 +170,7 @@
     "default":      5.0,
     "units":        "m/s",
     "min":          0.5,
-    "max":          12.0,
+    "max":          6.9444444444,
     "decimalPlaces":    1
 },
 {

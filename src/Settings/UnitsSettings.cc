@@ -15,6 +15,23 @@
 DECLARE_SETTINGGROUP(Units, "Units")
 {
     qmlRegisterUncreatableType<UnitsSettings>("QGroundControl.SettingsManager", 1, 0, "UnitsSettings", "Reference only");
+
+    // FishMaps uses one fixed unit system. Force it here as well as using these
+    // values as defaults so existing installations cannot retain old choices.
+    horizontalDistanceUnits()->setRawValue(HorizontalDistanceUnitsMeters);
+    verticalDistanceUnits()->setRawValue(VerticalDistanceUnitsMeters);
+    areaUnits()->setRawValue(AreaUnitsSquareMeters);
+    speedUnits()->setRawValue(SpeedUnitsKilometersPerHour);
+    temperatureUnits()->setRawValue(TemperatureUnitsCelsius);
+    weightUnits()->setRawValue(WeightUnitsGrams);
+
+    _horizontalDistanceUnitsFact->setVisible(false);
+    _verticalDistanceUnitsFact->setVisible(false);
+    _areaUnitsFact->setVisible(false);
+    _speedUnitsFact->setVisible(false);
+    _temperatureUnitsFact->setVisible(false);
+    _weightUnitsFact->setVisible(false);
+    setVisible(false);
 }
 
 DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, horizontalDistanceUnits)
@@ -30,6 +47,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, horizontalDistanceUnits)
         metaData->setName(horizontalDistanceUnitsName);
         metaData->setShortDescription("Distance units");
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         metaData->setRawDefaultValue(HorizontalDistanceUnitsMeters);
         metaData->setQGCRebootRequired(true);
@@ -51,6 +69,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, verticalDistanceUnits)
         metaData->setName(verticalDistanceUnitsName);
         metaData->setShortDescription("Altitude units");
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         metaData->setRawDefaultValue(VerticalDistanceUnitsMeters);
         metaData->setQGCRebootRequired(true);
@@ -77,6 +96,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, areaUnits)
         metaData->setName(areaUnitsName);
         metaData->setShortDescription("Area units");
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         metaData->setRawDefaultValue(AreaUnitsSquareMeters);
         metaData->setQGCRebootRequired(true);
@@ -102,6 +122,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, speedUnits)
         metaData->setName(speedUnitsName);
         metaData->setShortDescription("Speed units");
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         metaData->setRawDefaultValue(SpeedUnitsKilometersPerHour);
         metaData->setQGCRebootRequired(true);
@@ -122,6 +143,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, temperatureUnits)
         metaData->setName(temperatureUnitsName);
         metaData->setShortDescription("Temperature units");
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         metaData->setRawDefaultValue(TemperatureUnitsCelsius);
         metaData->setQGCRebootRequired(true);
@@ -146,6 +168,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(UnitsSettings, weightUnits)
         metaData->setName(weightUnitsName);
         metaData->setShortDescription(UnitsSettings::tr("Weight units"));
         metaData->setEnumInfo(enumStrings, enumValues);
+        metaData->setReadOnly(true);
 
         WeightUnits defaultWeightUnit = WeightUnitsGrams;
         switch(QLocale::system().measurementSystem()) {

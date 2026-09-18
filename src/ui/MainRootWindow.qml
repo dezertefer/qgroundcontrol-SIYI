@@ -358,6 +358,12 @@ ApplicationWindow {
     }
 
     function showPlanView() {
+        var activeVehicle = QGroundControl.multiVehicleManager.activeVehicle
+        if (activeVehicle && (activeVehicle.armed || activeVehicle.flying)) {
+            showMessageDialog(qsTr("Mission editing unavailable"),
+                              qsTr("Mission editing is disabled while the aircraft is armed or flying."))
+            return
+        }
         viewSwitch(toolbar.planViewToolbar)
         planView.visible = true
     }
@@ -430,6 +436,7 @@ ApplicationWindow {
         var dialog = dialogDrawerComponent.createObject(mainWindow, { width: dialogWidth, dialogComponent: component, dialogTitle: title, dialogButtons: buttons })
         mainWindow.pushPreventViewSwitch()
         dialog.open()
+        return dialog
     }
 
     Component {

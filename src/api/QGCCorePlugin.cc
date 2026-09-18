@@ -146,6 +146,7 @@ QVariantList &QGCCorePlugin::settingsPages()
                                                 QUrl::fromUserInput("qrc:/qml/OfflineMap.qml"),
                                                 QUrl::fromUserInput("qrc:/res/waves.svg"));
         _p->settingsList.append(QVariant::fromValue(reinterpret_cast<QmlComponentInfo*>(_p->pOfflineMaps)));
+#if 0 // Fish Maps only exposes General, Comm Links, and Offline Maps.
 #if defined(QGC_GST_TAISYNC_ENABLED)
         _p->pTaisync = new QmlComponentInfo(tr("Taisync"),
                                             QUrl::fromUserInput("qrc:/qml/TaisyncSettings.qml"),
@@ -188,6 +189,7 @@ QVariantList &QGCCorePlugin::settingsPages()
         _p->pQmlTest = new QmlComponentInfo(tr("Palette Test"),
                                             QUrl::fromUserInput("qrc:/qml/QmlTest.qml"));
         _p->settingsList.append(QVariant::fromValue(reinterpret_cast<QmlComponentInfo*>(_p->pQmlTest)));
+#endif
 #endif
     }
     return _p->settingsList;
@@ -464,7 +466,7 @@ const QVariantList& QGCCorePlugin::toolBarIndicators(void)
 
 QList<int> QGCCorePlugin::firstRunPromptStdIds(void)
 {
-    QList<int> rgStdIds = { unitsFirstRunPromptId, offlineVehicleFirstRunPromptId };
+    QList<int> rgStdIds = { offlineVehicleFirstRunPromptId };
     return rgStdIds;
 }
 

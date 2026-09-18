@@ -63,10 +63,7 @@ Item {
     property string _batteryChangePointText:    _batteryChangePoint < 0 ?       qsTr("N/A") : _batteryChangePoint
     property string _batteriesRequiredText:     _batteriesRequired < 0 ?        qsTr("N/A") : _batteriesRequired
 
-    readonly property real _launchAllowanceMeters:  2.0
-    property real   _winchLengthMeters:         _controllerValid ? Number(QGroundControl.settingsManager.planViewSettings.currentProfileWinchLength.rawValue) : NaN
-    property bool   _withinWinchLimit:           !isNaN(_missionMaxTelemetry) && !isNaN(_winchLengthMeters) &&
-                                                  _missionMaxTelemetry <= _winchLengthMeters + _launchAllowanceMeters
+    property bool   _mainLineExceeded:           _controllerValid && _planMasterController.missionController.aerokontikiMainLineExceeded
 
     readonly property real _margins: ScreenTools.defaultFontPixelWidth
 
@@ -112,6 +109,14 @@ Item {
         anchors.left:           parent.left
         columnSpacing:          0
         columns:                4
+
+        QGCLabel {
+            text:               qsTr("Drop point is too far for the selected Main Line!")
+            color:              "red"
+            font.bold:          true
+            visible:            _mainLineExceeded
+            Layout.alignment:   Qt.AlignVCenter | Qt.AlignLeft
+        }
 
         GridLayout {
             columns:                8
@@ -247,14 +252,6 @@ Item {
             Item { width: 1; height: 1 }
         }
 
-        QGCLabel
-        {
-            text: _controllerValid && _planMasterController.containsItems && !_withinWinchLimit
-                    ? qsTr("Drop point exceeds winch length!")
-                    : ""
-            color: "red"
-            Layout.columnSpan: 4
-        }
     }
 
     // Small mission download progress bar

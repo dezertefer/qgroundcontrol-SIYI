@@ -86,8 +86,16 @@ Item {
         return _takeoffRel + Math.max(0, L * Math.sin(theta)) + 10
     }
 
-    // Clamp the Fact if it's too low
-    function _enforceHaulAltitudeMin(showToast) {
+    function _haulAltitudeConstraintApplies() {
+        return backend.dropPointSelected && _missionController.containsItems
+    }
+
+    // Clamp only when a prepared mission needs the rope-clearance constraint.
+    function _enforceHaulAltitudeMin(showToast, force) {
+        if (!force && !_haulAltitudeConstraintApplies()) {
+            return
+        }
+
         var minAlt = _minHaulAltRel()
         var curAlt = Number(_planViewSettings.currentProfileAlt.rawValue) || 0
         if (curAlt < minAlt) {
@@ -104,18 +112,51 @@ Item {
         }
     }
 
+    function _scheduleHaulAltitudeCheck(showToast) {
+        haulAltitudeCheckTimer.showToast = haulAltitudeCheckTimer.showToast || showToast
+        haulAltitudeCheckTimer.restart()
+    }
+
+    Timer {
+        id: haulAltitudeCheckTimer
+        interval: 0
+        repeat: false
+        property bool showToast: false
+
+        onTriggered: {
+            var shouldShowToast = showToast
+            showToast = false
+            _enforceHaulAltitudeMin(shouldShowToast, false)
+        }
+    }
+
     Connections {
         target: _planViewSettings.currentProfileAlt
-        function onRawValueChanged() { _enforceHaulAltitudeMin(false) }
+        function onRawValueChanged() { _scheduleHaulAltitudeCheck(false) }
     }
     Connections {
         target: _planViewSettings.currentProfileAngle
-        function onRawValueChanged() { _enforceHaulAltitudeMin(true) }
+        function onRawValueChanged() { _scheduleHaulAltitudeCheck(true) }
     }
     Connections {
         target: _planViewSettings.currentProfileCableLength
-        function onRawValueChanged() { _enforceHaulAltitudeMin(true) }
+        function onRawValueChanged() { _scheduleHaulAltitudeCheck(true) }
     }
+
+    Connections {
+        target: globals.activeVehicle
+
+        function _leavePlanViewIfVehicleInUse() {
+            var vehicle = globals.activeVehicle
+            if (_root.visible && vehicle && (vehicle.armed || vehicle.flying)) {
+                mainWindow.showFlyView()
+            }
+        }
+
+        function onArmedChanged() { _leavePlanViewIfVehicleInUse() }
+        function onFlyingChanged() { _leavePlanViewIfVehicleInUse() }
+    }
+
     Component.onCompleted: _enforceHaulAltitudeMin(false)
 
     Timer {
@@ -441,6 +482,7 @@ Item {
             // Feed A/B and compute C/D (backend sets lat/lon; we'll set REL altitudes here)
             backend.A = vehicleCoordinate
             backend.B = coordinate
+            _enforceHaulAltitudeMin(true, true)
             void backend.angle
 
             // ---- profile (REL) ----
@@ -1903,7 +1945,7 @@ Item {
                             visible: _isNew
                         }
 
-                        QGCLabel { text: qsTr("Winch:") }
+                        QGCLabel { text: qsTr("Main Line:") }
                         FactTextField {
                             fact: _isNew ? _planViewSettings.newProfileWinchLength
                                          : _planViewSettings.currentProfileWinchLength

@@ -35,6 +35,7 @@
 
 #include "QGC.h"
 #include "QGCApplication.h"
+#include "FishMapsVersion.h"
 #include "CmdLineOptParser.h"
 #include "UDPLink.h"
 #include "LinkManager.h"
@@ -273,7 +274,7 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     setOrganizationName(QGC_ORG_NAME);
     setOrganizationDomain(QGC_ORG_DOMAIN);
 
-    this->setApplicationVersion(QString(APP_VERSION_STR));
+    this->setApplicationVersion(QStringLiteral(FISHMAPS_VERSION_STRING));
 
     // Set settings format
     QSettings::setDefaultFormat(QSettings::IniFormat);

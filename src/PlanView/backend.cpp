@@ -9,6 +9,15 @@
 #include <iostream>
 #include <QIODevice>
 
+namespace {
+constexpr double kMaximumProfileSpeedMetersPerSecond = 25.0 / 3.6;
+
+double boundedProfileSpeed(const QVariant& value)
+{
+    return qMin(value.toDouble(), kMaximumProfileSpeedMetersPerSecond);
+}
+}
+
 
 
 BackEnd::BackEnd(QObject *parent) :
@@ -230,9 +239,9 @@ void BackEnd::updateCurrentProfile (QString profile)
 {
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileName()->setRawValue(m_selectedProfile["name"]);
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->setRawValue(m_selectedProfile["alt"].toDouble());
-    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->setRawValue(m_selectedProfile["speed"].toDouble());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->setRawValue(boundedProfileSpeed(m_selectedProfile["speed"]));
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->setRawValue(m_selectedProfile["angle"].toDouble());
-    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->setRawValue(m_selectedProfile["takeOffSpeed"].toString());
+    qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->setRawValue(boundedProfileSpeed(m_selectedProfile["takeOffSpeed"]));
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->setRawValue(m_selectedProfile["cableLength"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinchLength()->setRawValue(m_selectedProfile["winchLength"].toDouble());
     qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileUseDropAlt()->setRawValue(m_selectedProfile["useDropAlt"].toBool());
@@ -380,6 +389,14 @@ void BackEnd::readJson ()
         }
         if (!p.contains("winchLength")) {
             p.insert("winchLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinchLength()->rawDefaultValue().toDouble());
+            changed = true;
+        }
+        if (p.value("speed").toDouble() > kMaximumProfileSpeedMetersPerSecond) {
+            p.insert("speed", kMaximumProfileSpeedMetersPerSecond);
+            changed = true;
+        }
+        if (p.value("takeOffSpeed").toDouble() > kMaximumProfileSpeedMetersPerSecond) {
+            p.insert("takeOffSpeed", kMaximumProfileSpeedMetersPerSecond);
             changed = true;
         }
 
@@ -590,8 +607,8 @@ void BackEnd::editProfile (const QString &profile)
    currentProfile.insert("name", profile);
    currentProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAngle()->rawValue().toString());
    currentProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileAlt()->rawValue().toString());
-   currentProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue().toString());
-   currentProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue().toString());
+   currentProfile.insert("speed", boundedProfileSpeed(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileSpeed()->rawValue()));
+   currentProfile.insert("takeOffSpeed", boundedProfileSpeed(qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileTakeOffSpeed()->rawValue()));
    currentProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileCableLength()->rawValue().toString());
    currentProfile.insert("winchLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileWinchLength()->rawValue().toDouble());
    currentProfile.insert("useDropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->currentProfileUseDropAlt()->rawValue().toBool());
@@ -624,8 +641,8 @@ void BackEnd::setNewProfile(const QString &profile)
     newProfile.insert("name",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileName()->rawValue().toString());
     newProfile.insert("angle",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAngle()->rawValue().toString());
     newProfile.insert("alt",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileAlt()->rawValue().toString());
-    newProfile.insert("speed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue().toString());
-    newProfile.insert("takeOffSpeed",qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileTakeOffSpeed()->rawValue().toString());
+    newProfile.insert("speed", boundedProfileSpeed(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileSpeed()->rawValue()));
+    newProfile.insert("takeOffSpeed", boundedProfileSpeed(qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileTakeOffSpeed()->rawValue()));
     newProfile.insert("cableLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileCableLength()->rawValue().toString());
     newProfile.insert("winchLength", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileWinchLength()->rawValue().toDouble());
     newProfile.insert("useDropAlt", qgcApp()->toolbox()->settingsManager()->planViewSettings()->newProfileUseDropAlt()->rawValue().toBool());

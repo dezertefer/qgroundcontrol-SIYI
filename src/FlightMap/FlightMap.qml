@@ -157,9 +157,8 @@ Map {
             QGroundControl.settingsManager.flightMapSettings.mapProvider.value
 
         property string _labelText:
-            (_provider === "Geoserver") ? qsTr("Marine map")
-          : (_provider === "Bing")      ? qsTr("Aerial map")
-          : qsTr("Map")
+            (_provider === "Geoserver") ? qsTr("Marine Maps")
+                                          : qsTr("Aerial Maps")
 
         Text {
             text: mapTypeBadge._labelText

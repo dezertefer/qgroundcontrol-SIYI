@@ -156,39 +156,24 @@ StableBuild {
     DEFINES += DAILY_BUILD
 }
 
-# Set the QGC version from git
-APP_VERSION_STR = vUnknown
-VERSION         = 0.0.0   # Marker to indicate out-of-tree build
-MAC_VERSION     = 0.0.0
+# Fish Maps release version. Increment this value for each public app release.
+FISHMAPS_VERSION = 2.0.2
+
+APP_VERSION_STR = $${FISHMAPS_VERSION}
+VERSION         = $${FISHMAPS_VERSION}
+MAC_VERSION     = $${FISHMAPS_VERSION}
 MAC_BUILD       = 0
-exists ($$PWD/.git) {
-    GIT_DESCRIBE = $$system(git --git-dir $$PWD/.git --work-tree $$PWD describe --always --tags)
-    GIT_BRANCH   = $$system(git --git-dir $$PWD/.git --work-tree $$PWD rev-parse --abbrev-ref HEAD)
-    GIT_HASH     = $$system(git --git-dir $$PWD/.git --work-tree $$PWD rev-parse --short HEAD)
-    GIT_TIME     = $$system(git --git-dir $$PWD/.git --work-tree $$PWD show --oneline --format=\"%ci\" -s HEAD)
 
-    message(GIT_DESCRIBE $${GIT_DESCRIBE})
+# Make the version a real C++ dependency. A changed compiler define alone does
+# not cause qmake builds to recompile an existing object file.
+FISHMAPS_VERSION_HEADER = $${OUT_PWD}/FishMapsVersion.h
+FISHMAPS_VERSION_HEADER_CONTENT = "$${LITERAL_HASH}pragma once"
+FISHMAPS_VERSION_HEADER_CONTENT += "$${LITERAL_HASH}define FISHMAPS_VERSION_STRING \"$${FISHMAPS_VERSION}\""
+write_file($${FISHMAPS_VERSION_HEADER}, FISHMAPS_VERSION_HEADER_CONTENT)
+INCLUDEPATH += $${OUT_PWD}
+HEADERS += $${FISHMAPS_VERSION_HEADER}
 
-    # Pull the version info from the last annotated version tag. Format: v#.#.#
-    contains(GIT_DESCRIBE, ^v[0-9]+.[0-9]+.[0-9]+.*) {
-        APP_VERSION_STR = $${GIT_DESCRIBE}
-        VERSION         = $$replace(GIT_DESCRIBE, "v", "")
-        VERSION         = $$replace(VERSION, "-", ".")
-        VERSION         = $$section(VERSION, ".", 0, 3)
-    }
-
-    DailyBuild {
-        APP_VERSION_STR = "Daily $${GIT_BRANCH}:$${GIT_HASH} $${GIT_TIME}"
-    }
-
-    message(AeroKontiki APP_VERSION_STR VERSION $${APP_VERSION_STR} $${VERSION})
-
-    MacBuild {
-        MAC_VERSION  = $$section(VERSION, ".", 0, 2)
-        MAC_BUILD    = $$section(VERSION, ".", 3, 3)
-        message(QGroundControl MAC_VERSION MAC_BUILD $${MAC_VERSION} $${MAC_BUILD})
-    }
-}
+message(Fish Maps APP_VERSION_STR VERSION $${APP_VERSION_STR} $${VERSION})
 DEFINES += APP_VERSION_STR=\"\\\"$$APP_VERSION_STR\\\"\"
 
 AndroidBuild {
@@ -224,13 +209,14 @@ AndroidBuild {
         DEV_VERSION = $$join(DEV_VERSION, "", "0")
     }
 
-    # Bitness for android version number is 66/34 instead of 64/32 in because of a required version number bump screw-up ages ago
+    # The 67/35 prefixes keep Fish Maps 2.x updates newer than APKs which used
+    # QGC's 66/34 prefix and upstream 4.x semantic version.
     equals(ANDROID_TARGET_ARCH, arm64-v8a)  {
         ANDROID_TRUE_BITNESS = 64
-        ANDROID_VERSION_BITNESS = 66
+        ANDROID_VERSION_BITNESS = 67
     } else {
         ANDROID_TRUE_BITNESS = 32
-        ANDROID_VERSION_BITNESS = 34
+        ANDROID_VERSION_BITNESS = 35
     }
 
     # Version code format: BBMIPPDDD (B=Bitness, I=Minor)
@@ -243,7 +229,7 @@ AndroidBuild {
 
     message(Android version info: $${ANDROID_VERSION_CODE} bitness:$${ANDROID_VERSION_BITNESS} major:$${MAJOR_VERSION} minor:$${MINOR_VERSION} patch:$${PATCH_VERSION} dev:$${DEV_VERSION})
 
-    ANDROID_VERSION_NAME    = APP_VERSION_STR
+    ANDROID_VERSION_NAME = $${APP_VERSION_STR}
 }
 
 DEFINES += EIGEN_MPL2_ONLY
