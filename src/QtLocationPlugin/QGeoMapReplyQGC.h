@@ -49,6 +49,7 @@
 
 #include <QtNetwork/QNetworkReply>
 #include <QtLocation/private/qgeotiledmapreply_p.h>
+#include <QPointer>
 #include <QTimer>
 
 #include "QGCMapEngineData.h"
@@ -75,7 +76,7 @@ private:
     void _clearReply            ();
 
 private:
-    QNetworkReply*          _reply;
+    QPointer<QNetworkReply> _reply;
     QNetworkRequest         _request;
     QNetworkAccessManager*  _networkManager;
     QByteArray              _badMapbox;
