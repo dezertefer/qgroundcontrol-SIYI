@@ -19,6 +19,7 @@ Item {
     property string title
     property bool   selectExisting: true
     property bool   selectFolder:   false
+    property bool   useAndroidDocumentPicker: false
 
     signal acceptedForLoad(string file)
     signal acceptedForSave(string file)
@@ -26,6 +27,9 @@ Item {
 
     function openForLoad() {
         _openForLoad = true
+        if (useAndroidDocumentPicker && ScreenTools.isMobile && controller.openAndroidDocument()) {
+            return
+        }
         if (_mobileDlg && folder.length !== 0) {
             mainWindow.showComponentDialog(mobileFileOpenDialog, title, mainWindow.showDialogDefaultWidth, StandardButton.Cancel)
         } else {
@@ -86,6 +90,17 @@ Item {
 
     QGCFileDialogController { id: controller }
     QGCPalette { id: qgcPal; colorGroupEnabled: true }
+
+    Connections {
+        target: controller
+        onAndroidDocumentSelected: {
+            if (uri.length > 0) {
+                _root.acceptedForLoad(uri)
+            } else {
+                _root.rejected()
+            }
+        }
+    }
 
     FileDialog {
         id:             fullFileDialog

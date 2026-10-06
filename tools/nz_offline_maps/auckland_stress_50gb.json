@@ -1,0 +1,24 @@
+{
+  "wms_url": "http://127.0.0.1:8080/geoserver/wms",
+  "output": "E:\\GeoServer\\QGCOfflineMaps\\auckland-stress-50gb.qgctiledb",
+  "bounds": [173.7, -37.65, 176.0, -36.15],
+  "min_zoom": 0,
+  "max_zoom": 16,
+  "map_type": "Geoserver Map",
+  "map_type_id": 685018728,
+  "set_name": "Auckland Stress Test 50GB",
+  "block_tiles": 8,
+  "workers": 2,
+  "timeout": 120,
+  "retries": 3,
+  "wms_format": "image/png",
+  "png_compress_level": 0,
+  "keep_transparent": true,
+  "layer_rules": [
+    {
+      "min_zoom": 0,
+      "max_zoom": 16,
+      "layers": ["tiger:AUCKLAND"]
+    }
+  ]
+}

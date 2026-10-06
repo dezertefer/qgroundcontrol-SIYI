@@ -429,6 +429,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 #
 
 HEADERS += \
+    src/AndroidDocumentUtils.h \
     src/MissionManager/AerokontikiMissionStore.h \
     src/PlanView/backend.h \
     src/QmlControls/QmlUnitsConversion.h \

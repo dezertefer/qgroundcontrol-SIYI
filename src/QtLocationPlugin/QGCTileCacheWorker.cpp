@@ -18,6 +18,7 @@
 
 #include "QGCMapEngine.h"
 #include "QGCMapTileSet.h"
+#include "AndroidDocumentUtils.h"
 
 #include <QVariant>
 #include <QtSql/QSqlQuery>
@@ -26,13 +27,104 @@
 #include <QDateTime>
 #include <QApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QSettings>
+#include <QStringList>
 
 #include "time.h"
 
 static const char*      kDefaultSet     = "Default Tile Set";
 static const QString    kSession        = QStringLiteral("QGeoTileWorkerSession");
 static const QString    kExportSession  = QStringLiteral("QGeoTileExportSession");
+static const QString    kExternalSessionPrefix = QStringLiteral("QGeoTileExternalSession");
+static const qint64     kExternalImportThreshold = 512LL * 1024LL * 1024LL;
+
+namespace {
+
+struct ExternalSourceHandle
+{
+    QString storedPath;
+    QString databasePath;
+    qint64 size = -1;
+    int fileDescriptor = -1;
+    bool databasePathIsUri = false;
+
+    bool isValid() const { return !databasePath.isEmpty(); }
+};
+
+ExternalSourceHandle openExternalSource(const QString& requestedPath)
+{
+    ExternalSourceHandle source;
+    source.storedPath = requestedPath;
+
+    if(AndroidDocumentUtils::isContentUri(requestedPath)) {
+        source.fileDescriptor = AndroidDocumentUtils::openReadOnlyFileDescriptor(
+                    requestedPath, &source.size);
+        if(source.fileDescriptor >= 0) {
+            // Android's external-storage provider represents a real local file.
+            // Prefer its direct path when scoped-storage rules allow it.
+            const QString directPath =
+                    AndroidDocumentUtils::directExternalStoragePath(requestedPath);
+            QFile directFile(directPath);
+            if(!directPath.isEmpty() && directFile.open(QIODevice::ReadOnly)) {
+                source.size = directFile.size();
+                directFile.close();
+                AndroidDocumentUtils::closeFileDescriptor(source.fileDescriptor);
+                source.fileDescriptor = -1;
+                source.databasePath = QUrl::fromLocalFile(directPath)
+                        .toString(QUrl::FullyEncoded)
+                        + QStringLiteral("?mode=ro&immutable=1");
+            } else {
+                // SQLite needs URI mode and immutable=1 when it reopens an
+                // already-authorized SAF descriptor. Immutable mode also keeps
+                // it from attempting journal or lock files beside /proc/self/fd.
+                source.databasePath = QStringLiteral(
+                            "file:///proc/self/fd/%1?mode=ro&immutable=1")
+                        .arg(source.fileDescriptor);
+            }
+            source.databasePathIsUri = true;
+        }
+        return source;
+    }
+
+    const QFileInfo file(requestedPath);
+    if(!file.exists() || !file.isFile()) {
+        return source;
+    }
+
+    source.storedPath = file.canonicalFilePath().isEmpty()
+            ? file.absoluteFilePath()
+            : file.canonicalFilePath();
+    source.databasePath = source.storedPath;
+    source.size = file.size();
+    return source;
+}
+
+void closeExternalSource(ExternalSourceHandle& source)
+{
+    AndroidDocumentUtils::closeFileDescriptor(source.fileDescriptor);
+    source.fileDescriptor = -1;
+}
+
+qint64 externalSourceSize(const QString& path)
+{
+    ExternalSourceHandle source = openExternalSource(path);
+    const qint64 size = source.isValid() ? source.size : -1;
+    closeExternalSource(source);
+    return size;
+}
+
+bool isOfflineMapDebugType(const QString& type)
+{
+    return type.contains(QStringLiteral("Geoserver"), Qt::CaseInsensitive);
+}
+
+bool isOfflineMapDebugHash(const QString& hash)
+{
+    return isOfflineMapDebugType(getQGCMapEngine()->hashToType(hash));
+}
+
+}
 
 QGC_LOGGING_CATEGORY(QGCTileCacheLog, "QGCTileCacheLog")
 
@@ -328,21 +420,83 @@ QGCCacheWorker::_getTile(QGCMapTask* mtask)
     }
     bool found = false;
     QGCFetchTileTask* task = static_cast<QGCFetchTileTask*>(mtask);
+    const bool offlineMapDebug = isOfflineMapDebugHash(task->hash());
+    if(offlineMapDebug) {
+        qInfo().noquote() << "[OfflineMapDebug] cache lookup"
+                          << "hash=" << task->hash()
+                          << "database=" << _databasePath;
+    }
     QSqlQuery query(*_db);
-    QString s = QString("SELECT tile, format, type FROM Tiles WHERE hash = \"%1\"").arg(task->hash());
-    if(query.exec(s)) {
+    query.prepare(QStringLiteral("SELECT tile, format, type FROM Tiles WHERE hash = ?"));
+    query.addBindValue(task->hash());
+    if(query.exec()) {
         if(query.next()) {
-            QByteArray ar   = query.value(0).toByteArray();
-            QString format  = query.value(1).toString();
-            QString type = getQGCMapEngine()->urlFactory()->getTypeFromId(query.value(2).toInt());
+            const QByteArray ar = query.value(0).toByteArray();
+            const QString format = query.value(1).toString();
+            const int typeId = query.value(2).toInt();
+            const QString type = getQGCMapEngine()->urlFactory()->getTypeFromId(typeId);
             qCDebug(QGCTileCacheLog) << "_getTile() (Found in DB) HASH:" << task->hash();
-            QGCCacheTile* tile = new QGCCacheTile(task->hash(), ar, format, type);
-            task->setTileFetched(tile);
+            if(offlineMapDebug) {
+                qInfo().noquote() << "[OfflineMapDebug] cache HIT"
+                                  << "hash=" << task->hash()
+                                  << "source=local"
+                                  << "typeId=" << typeId
+                                  << "type=" << type
+                                  << "format=" << format
+                                  << "bytes=" << ar.size()
+                                  << "header=" << ar.left(8).toHex();
+            }
+            task->setTileFetched(new QGCCacheTile(task->hash(), ar, format, type));
             found = true;
+        }
+    } else if(offlineMapDebug) {
+        qInfo().noquote() << "[OfflineMapDebug] cache SQL ERROR"
+                          << "hash=" << task->hash()
+                          << "error=" << query.lastError().text();
+    }
+    if(!found) {
+        for(QGCExternalTileDatabase& external : _externalDatabases) {
+            QSqlQuery externalQuery(external.database);
+            externalQuery.prepare(QStringLiteral("SELECT tile, format, type FROM Tiles WHERE hash = ?"));
+            externalQuery.addBindValue(task->hash());
+            if(!externalQuery.exec()) {
+                if(offlineMapDebug) {
+                    qInfo().noquote() << "[OfflineMapDebug] external cache SQL ERROR"
+                                      << "hash=" << task->hash()
+                                      << "path=" << external.path
+                                      << "error=" << externalQuery.lastError().text();
+                }
+                continue;
+            }
+            if(!externalQuery.next()) {
+                continue;
+            }
+            const QByteArray ar = externalQuery.value(0).toByteArray();
+            const QString format = externalQuery.value(1).toString();
+            const int typeId = externalQuery.value(2).toInt();
+            const QString type = getQGCMapEngine()->urlFactory()->getTypeFromId(typeId);
+            if(offlineMapDebug) {
+                qInfo().noquote() << "[OfflineMapDebug] cache HIT"
+                                  << "hash=" << task->hash()
+                                  << "source=external"
+                                  << "path=" << external.path
+                                  << "typeId=" << typeId
+                                  << "type=" << type
+                                  << "format=" << format
+                                  << "bytes=" << ar.size()
+                                  << "header=" << ar.left(8).toHex();
+            }
+            task->setTileFetched(new QGCCacheTile(task->hash(), ar, format, type));
+            found = true;
+            break;
         }
     }
     if(!found) {
         qCDebug(QGCTileCacheLog) << "_getTile() (NOT in DB) HASH:" << task->hash();
+        if(offlineMapDebug) {
+            qInfo().noquote() << "[OfflineMapDebug] cache MISS"
+                              << "hash=" << task->hash();
+        }
         task->setError("Tile not in cache database");
     }
 }
@@ -394,6 +548,30 @@ QGCCacheWorker::_updateSetTotals(QGCCachedTileSet* set)
         set->setSavedTileSize(_totalSize);
         set->setTotalTileCount(_defaultCount);
         set->setTotalTileSize(_defaultSize);
+        return;
+    }
+    QSqlQuery externalSetQuery(*_db);
+    externalSetQuery.prepare(QStringLiteral("SELECT path FROM ExternalTileSets WHERE setID = ?"));
+    externalSetQuery.addBindValue(QVariant::fromValue<qulonglong>(set->id()));
+    if(externalSetQuery.exec() && externalSetQuery.next()) {
+        const QString externalPath = externalSetQuery.value(0).toString();
+        qint64 sourceSize = -1;
+        for(const QGCExternalTileDatabase& external : _externalDatabases) {
+            if(external.path == externalPath) {
+                sourceSize = external.size;
+                break;
+            }
+        }
+        if(sourceSize < 0) {
+            sourceSize = externalSourceSize(externalPath);
+        }
+        const bool available = sourceSize >= 0;
+        const quint64 externalSize = available ? static_cast<quint64>(sourceSize) : 0;
+        set->setSavedTileCount(available ? set->totalTileCount() : 0);
+        set->setSavedTileSize(externalSize);
+        set->setTotalTileSize(externalSize);
+        set->setUniqueTileCount(set->totalTileCount());
+        set->setUniqueTileSize(externalSize);
         return;
     }
     QSqlQuery subquery(*_db);
@@ -452,6 +630,30 @@ QGCCacheWorker::_updateTotals()
         if(query.next()) {
             _totalCount = query.value(0).toUInt();
             _totalSize  = query.value(1).toULongLong();
+        }
+    }
+    QSqlQuery externalQuery(*_db);
+    if(externalQuery.exec(QStringLiteral(
+            "SELECT COALESCE(SUM(TileSets.numTiles), 0) "
+            "FROM TileSets INNER JOIN ExternalTileSets USING(setID)")) && externalQuery.next()) {
+        _totalCount += externalQuery.value(0).toUInt();
+    }
+    if(externalQuery.exec(QStringLiteral("SELECT DISTINCT path FROM ExternalTileSets"))) {
+        while(externalQuery.next()) {
+            const QString externalPath = externalQuery.value(0).toString();
+            qint64 sourceSize = -1;
+            for(const QGCExternalTileDatabase& external : _externalDatabases) {
+                if(external.path == externalPath) {
+                    sourceSize = external.size;
+                    break;
+                }
+            }
+            if(sourceSize < 0) {
+                sourceSize = externalSourceSize(externalPath);
+            }
+            if(sourceSize >= 0) {
+                _totalSize += static_cast<quint64>(sourceSize);
+            }
         }
     }
     s = QString("SELECT COUNT(size), SUM(size) FROM Tiles WHERE tileID IN (SELECT A.tileID FROM SetTiles A join SetTiles B on A.tileID = B.tileID WHERE B.setID = %1 GROUP by A.tileID HAVING COUNT(A.tileID) = 1)").arg(_getDefaultTileSet());
@@ -664,6 +866,9 @@ QGCCacheWorker::_deleteTileSet(qulonglong id)
 {
     QSqlQuery query(*_db);
     QString s;
+    query.prepare(QStringLiteral("DELETE FROM ExternalTileSets WHERE setID = ?"));
+    query.addBindValue(QVariant::fromValue<qulonglong>(id));
+    const bool removedExternalSet = query.exec() && query.numRowsAffected() > 0;
     //-- Only delete tiles unique to this set
     s = QString("DELETE FROM Tiles WHERE tileID IN (SELECT A.tileID FROM SetTiles A JOIN SetTiles B ON A.tileID = B.tileID WHERE B.setID = %1 GROUP BY A.tileID HAVING COUNT(A.tileID) = 1)").arg(id);
     query.exec(s);
@@ -673,6 +878,10 @@ QGCCacheWorker::_deleteTileSet(qulonglong id)
     query.exec(s);
     s = QString("DELETE FROM SetTiles WHERE setID = %1").arg(id);
     query.exec(s);
+    if(removedExternalSet) {
+        _disconnectExternalDatabases();
+        _connectExternalDatabases();
+    }
     _updateTotals();
 }
 
@@ -763,6 +972,7 @@ QGCCacheWorker::_resetCacheDatabase(QGCMapTask* mtask)
         return;
     }
     QGCResetTask* task = static_cast<QGCResetTask*>(mtask);
+    _disconnectExternalDatabases();
     QSqlQuery query(*_db);
     QString s;
     s = QString("DROP TABLE Tiles");
@@ -772,6 +982,8 @@ QGCCacheWorker::_resetCacheDatabase(QGCMapTask* mtask)
     s = QString("DROP TABLE SetTiles");
     query.exec(s);
     s = QString("DROP TABLE TilesDownload");
+    query.exec(s);
+    s = QString("DROP TABLE IF EXISTS ExternalTileSets");
     query.exec(s);
     _valid = _createDB(*_db);
     task->setResetCompleted();
@@ -785,14 +997,205 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
         return;
     }
     QGCImportTileTask* task = static_cast<QGCImportTileTask*>(mtask);
+    ExternalSourceHandle importSource = openExternalSource(task->path());
+    const bool contentDocument = AndroidDocumentUtils::isContentUri(task->path());
+    qInfo().noquote() << "[OfflineMapDebug] import START"
+                      << "path=" << importSource.storedPath
+                      << "available=" << importSource.isValid()
+                      << "bytes=" << importSource.size
+                      << "contentDocument=" << contentDocument
+                      << "replace=" << task->replace()
+                      << "destination=" << _databasePath;
+    if(!importSource.isValid()) {
+        task->setError(contentDocument
+                       ? QStringLiteral("The selected Android document could not be opened. Check that the SD card is available and select the file again.")
+                       : QStringLiteral("The selected map database could not be opened."));
+        task->setImportCompleted();
+        return;
+    }
+    //-- Large packages must stay on their original storage. Copying a 50-100 GiB
+    //   database into the application cache is both wasteful and often impossible
+    //   on Android. Register a lightweight local tile-set record and query the
+    //   selected SQLite database directly instead.
+    //   Android Storage Access Framework documents must always stay in place:
+    //   they are represented by content URIs and cannot be copied with QFile.
+    const bool mountInPlace = contentDocument
+            || (!task->replace() && importSource.size >= kExternalImportThreshold);
+    if(mountInPlace) {
+        const QString sourcePath = importSource.storedPath;
+        const QString mountSession = QStringLiteral("%1_mount").arg(kExportSession);
+        bool mounted = false;
+        QString mountError;
+        quint64 sourceTileCount = 0;
+        int mountedSetCount = 0;
+        qInfo().noquote() << "[OfflineMapDebug] import MOUNT START"
+                          << "path=" << sourcePath
+                          << "access=" << (importSource.fileDescriptor >= 0
+                                               ? QStringLiteral("document-fd")
+                                               : QStringLiteral("direct-path"))
+                          << "sqliteSource=" << importSource.databasePath
+                          << "thresholdBytes=" << kExternalImportThreshold;
+        {
+            QSqlDatabase dbImport = QSqlDatabase::addDatabase("QSQLITE", mountSession);
+            dbImport.setDatabaseName(importSource.databasePath);
+            dbImport.setConnectOptions(importSource.databasePathIsUri
+                                       ? QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_OPEN_URI")
+                                       : QStringLiteral("QSQLITE_OPEN_READONLY"));
+            if(!dbImport.open()) {
+                const QSqlError error = dbImport.lastError();
+                mountError = QStringLiteral("%1 (native code %2)")
+                        .arg(error.text(), error.nativeErrorCode());
+            } else {
+                QSqlQuery sourceQuery(dbImport);
+                if(sourceQuery.exec(QStringLiteral("SELECT COUNT(tileID) FROM Tiles"))
+                        && sourceQuery.next()) {
+                    sourceTileCount = sourceQuery.value(0).toULongLong();
+                }
+                if(!sourceTileCount) {
+                    mountError = QStringLiteral("External database contains no tiles");
+                } else if(!sourceQuery.exec(QStringLiteral(
+                        "SELECT * FROM TileSets ORDER BY defaultSet DESC, name ASC"))) {
+                    mountError = sourceQuery.lastError().text();
+                } else {
+                    bool transactionOk = _db->transaction();
+                    while(transactionOk && sourceQuery.next()) {
+                        QString name = sourceQuery.value("name").toString();
+                        const quint64 sourceSetID = sourceQuery.value("setID").toULongLong();
+
+                        QSqlQuery alreadyMountedQuery(*_db);
+                        alreadyMountedQuery.prepare(QStringLiteral(
+                            "SELECT setID FROM ExternalTileSets WHERE sourceSetID = ? AND path = ?"));
+                        alreadyMountedQuery.addBindValue(QVariant::fromValue<qulonglong>(sourceSetID));
+                        alreadyMountedQuery.addBindValue(sourcePath);
+                        if(alreadyMountedQuery.exec() && alreadyMountedQuery.next()) {
+                            ++mountedSetCount;
+                            continue;
+                        }
+
+                        quint64 existingSetID = 0;
+                        if(_findTileSetID(name, existingSetID)) {
+                            QSqlQuery existingQuery(*_db);
+                            existingQuery.prepare(QStringLiteral(
+                                "SELECT "
+                                "(SELECT COUNT(*) FROM SetTiles WHERE setID = ?) + "
+                                "(SELECT COUNT(*) FROM TilesDownload WHERE setID = ?) + "
+                                "(SELECT COUNT(*) FROM ExternalTileSets WHERE setID = ?)"));
+                            existingQuery.addBindValue(QVariant::fromValue<qulonglong>(existingSetID));
+                            existingQuery.addBindValue(QVariant::fromValue<qulonglong>(existingSetID));
+                            existingQuery.addBindValue(QVariant::fromValue<qulonglong>(existingSetID));
+                            const bool emptyPlaceholder = existingQuery.exec()
+                                    && existingQuery.next()
+                                    && existingQuery.value(0).toULongLong() == 0;
+                            if(emptyPlaceholder) {
+                                QSqlQuery cleanupQuery(*_db);
+                                cleanupQuery.prepare(QStringLiteral(
+                                    "DELETE FROM TileSets WHERE setID = ? AND defaultSet = 0"));
+                                cleanupQuery.addBindValue(QVariant::fromValue<qulonglong>(existingSetID));
+                                transactionOk = cleanupQuery.exec();
+                            } else {
+                                int testCount = 0;
+                                while(true) {
+                                    const QString testName = QString::asprintf(
+                                                "%s %02d", name.toLatin1().data(), ++testCount);
+                                    quint64 unusedSetID = 0;
+                                    if(!_findTileSetID(testName, unusedSetID) || testCount > 99) {
+                                        name = testName;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if(!transactionOk) {
+                            break;
+                        }
+
+                        QSqlQuery insertQuery(*_db);
+                        insertQuery.prepare(QStringLiteral(
+                            "INSERT INTO TileSets("
+                            "name, typeStr, topleftLat, topleftLon, bottomRightLat, bottomRightLon, "
+                            "minZoom, maxZoom, type, numTiles, defaultSet, date"
+                            ") VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)"));
+                        insertQuery.addBindValue(name);
+                        insertQuery.addBindValue(sourceQuery.value("typeStr"));
+                        insertQuery.addBindValue(sourceQuery.value("topleftLat"));
+                        insertQuery.addBindValue(sourceQuery.value("topleftLon"));
+                        insertQuery.addBindValue(sourceQuery.value("bottomRightLat"));
+                        insertQuery.addBindValue(sourceQuery.value("bottomRightLon"));
+                        insertQuery.addBindValue(sourceQuery.value("minZoom"));
+                        insertQuery.addBindValue(sourceQuery.value("maxZoom"));
+                        insertQuery.addBindValue(sourceQuery.value("type"));
+                        insertQuery.addBindValue(sourceQuery.value("numTiles"));
+                        insertQuery.addBindValue(QDateTime::currentDateTime().toTime_t());
+                        if(!insertQuery.exec()) {
+                            mountError = insertQuery.lastError().text();
+                            transactionOk = false;
+                            break;
+                        }
+                        const quint64 destinationSetID = insertQuery.lastInsertId().toULongLong();
+                        QSqlQuery pathQuery(*_db);
+                        pathQuery.prepare(QStringLiteral(
+                            "INSERT INTO ExternalTileSets(setID, sourceSetID, path) VALUES(?, ?, ?)"));
+                        pathQuery.addBindValue(QVariant::fromValue<qulonglong>(destinationSetID));
+                        pathQuery.addBindValue(QVariant::fromValue<qulonglong>(sourceSetID));
+                        pathQuery.addBindValue(sourcePath);
+                        if(!pathQuery.exec()) {
+                            mountError = pathQuery.lastError().text();
+                            transactionOk = false;
+                            break;
+                        }
+                        ++mountedSetCount;
+                        qInfo().noquote() << "[OfflineMapDebug] import MOUNT SET"
+                                          << "name=" << name
+                                          << "sourceSetId=" << sourceSetID
+                                          << "destinationSetId=" << destinationSetID
+                                          << "path=" << sourcePath;
+                    }
+                    if(transactionOk && mountedSetCount > 0) {
+                        mounted = _db->commit();
+                        if(!mounted) {
+                            mountError = _db->lastError().text();
+                        }
+                    } else {
+                        _db->rollback();
+                    }
+                }
+                dbImport.close();
+            }
+        }
+        QSqlDatabase::removeDatabase(mountSession);
+        closeExternalSource(importSource);
+        if(mounted) {
+            _connectExternalDatabases();
+            task->setProgress(100);
+            qInfo().noquote() << "[OfflineMapDebug] import MOUNT FINISHED"
+                              << "path=" << sourcePath
+                              << "sets=" << mountedSetCount
+                              << "tiles=" << sourceTileCount;
+        } else {
+            qInfo().noquote() << "[OfflineMapDebug] import MOUNT FAILED"
+                              << "path=" << sourcePath
+                              << "error=" << mountError;
+            task->setError(QStringLiteral("Error mounting external map database: %1").arg(mountError));
+        }
+        task->setImportCompleted();
+        return;
+    }
+    closeExternalSource(importSource);
     //-- If replacing, simply copy over it
     if(task->replace()) {
         //-- Close and delete old database
         _disconnectDB();
         QFile file(_databasePath);
-        file.remove();
+        const bool removed = !file.exists() || file.remove();
         //-- Copy given database
-        QFile::copy(task->path(), _databasePath);
+        const bool copied = removed && QFile::copy(task->path(), _databasePath);
+        qInfo().noquote() << "[OfflineMapDebug] import REPLACE"
+                          << "removedOld=" << removed
+                          << "copied=" << copied
+                          << "destination=" << _databasePath;
+        if(!copied) {
+            task->setError(QStringLiteral("Error copying imported database to map cache"));
+        }
         task->setProgress(25);
         _init();
         if(_valid) {
@@ -806,6 +1209,8 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
         dbImport->setDatabaseName(task->path());
         dbImport->setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE");
         if (dbImport->open()) {
+            qInfo().noquote() << "[OfflineMapDebug] import database OPENED"
+                              << "path=" << task->path();
             QSqlQuery query(*dbImport);
             //-- Prepare progress report
             quint64 tileCount = 0;
@@ -819,6 +1224,7 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
                     tileCount  = query.value(0).toULongLong();
                 }
             }
+            qInfo().noquote() << "[OfflineMapDebug] import source tile count=" << tileCount;
             if(tileCount) {
                 //-- Iterate Tile Sets
                 s = QString("SELECT * FROM TileSets ORDER BY defaultSet DESC, name ASC");
@@ -837,6 +1243,15 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
                         quint32 numTiles        = query.value("numTiles").toUInt();
                         int     defaultSet      = query.value("defaultSet").toInt();
                         quint64 insertSetID     = _getDefaultTileSet();
+                        qInfo().noquote() << "[OfflineMapDebug] import tile set"
+                                          << "name=" << name
+                                          << "sourceSetId=" << setID
+                                          << "typeStr=" << mapType
+                                          << "typeId=" << type
+                                          << "bounds=" << topleftLat << topleftLon << bottomRightLat << bottomRightLon
+                                          << "zoom=" << minZoom << ".." << maxZoom
+                                          << "declaredTiles=" << numTiles
+                                          << "defaultSet=" << defaultSet;
                         //-- If not default set, create new one
                         if(!defaultSet) {
                             //-- Check if we have this tile set already
@@ -874,6 +1289,9 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
                             } else {
                                 //-- Get just created (auto-incremented) setID
                                 insertSetID = cQuery.lastInsertId().toULongLong();
+                                qInfo().noquote() << "[OfflineMapDebug] import destination set"
+                                                  << "name=" << name
+                                                  << "destinationSetId=" << insertSetID;
                             }
                         }
                         //-- Find set tiles
@@ -915,7 +1333,14 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
                                     }
                                 }
                             }
-                            _db->commit();
+                            const bool committed = _db->commit();
+                            qInfo().noquote() << "[OfflineMapDebug] import tile set RESULT"
+                                              << "name=" << name
+                                              << "destinationSetId=" << insertSetID
+                                              << "tilesFound=" << tilesFound
+                                              << "tilesSaved=" << tilesSaved
+                                              << "duplicates=" << (tilesFound - tilesSaved)
+                                              << "committed=" << committed;
                             if(tilesSaved) {
                                 //-- Update tile count (if any added)
                                 s = QString("SELECT COUNT(size) FROM Tiles A INNER JOIN SetTiles B on A.tileID = B.tileID WHERE B.setID = %1").arg(insertSetID);
@@ -950,9 +1375,14 @@ QGCCacheWorker::_importSets(QGCMapTask* mtask)
                 task->setError("No unique tiles in imported database");
             }
         } else {
+            qInfo().noquote() << "[OfflineMapDebug] import database OPEN FAILED"
+                              << "path=" << task->path()
+                              << "error=" << dbImport->lastError().text();
             task->setError("Error opening import database");
         }
     }
+    qInfo().noquote() << "[OfflineMapDebug] import FINISHED"
+                      << "path=" << task->path();
     task->setImportCompleted();
 }
 
@@ -1109,7 +1539,94 @@ QGCCacheWorker::_connectDB()
     _db->setDatabaseName(_databasePath);
     _db->setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE");
     _valid = _db->open();
+    if(_valid) {
+        _connectExternalDatabases();
+    }
     return _valid;
+}
+
+//-----------------------------------------------------------------------------
+void
+QGCCacheWorker::_connectExternalDatabases()
+{
+    _disconnectExternalDatabases();
+    if(!_db || !_db->isOpen()) {
+        return;
+    }
+    QSqlQuery query(*_db);
+    if(!query.exec(QStringLiteral("SELECT DISTINCT path FROM ExternalTileSets ORDER BY path"))) {
+        // The table does not exist during the first connection to a new cache.
+        return;
+    }
+    int index = 0;
+    while(query.next()) {
+        const QString path = query.value(0).toString();
+        ExternalSourceHandle source = openExternalSource(path);
+        if(!source.isValid()) {
+            qWarning().noquote() << "External offline map is unavailable:" << path;
+            continue;
+        }
+        const QString connectionName = QStringLiteral("%1_%2")
+                .arg(kExternalSessionPrefix)
+                .arg(++index);
+        bool opened = false;
+        QString openError;
+        {
+            QSqlDatabase externalDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+            externalDb.setDatabaseName(source.databasePath);
+            externalDb.setConnectOptions(source.databasePathIsUri
+                                         ? QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_OPEN_URI")
+                                         : QStringLiteral("QSQLITE_OPEN_READONLY"));
+            opened = externalDb.open();
+            if(opened) {
+                QGCExternalTileDatabase external;
+                external.path = path;
+                external.connectionName = connectionName;
+                external.database = externalDb;
+                external.size = source.size;
+                external.fileDescriptor = source.fileDescriptor;
+                source.fileDescriptor = -1;
+                _externalDatabases.append(external);
+                qInfo().noquote() << "[OfflineMapDebug] external database MOUNTED"
+                                  << "path=" << path
+                                  << "bytes=" << external.size
+                                  << "contentDocument=" << AndroidDocumentUtils::isContentUri(path);
+            } else {
+                const QSqlError error = externalDb.lastError();
+                openError = QStringLiteral("%1 (native code %2)")
+                        .arg(error.text(), error.nativeErrorCode());
+            }
+        }
+        if(!opened) {
+            QSqlDatabase::removeDatabase(connectionName);
+            qWarning().noquote() << "External offline map could not be opened:"
+                                 << path
+                                 << "sqliteSource=" << source.databasePath
+                                 << "error=" << openError;
+        }
+        closeExternalSource(source);
+    }
+}
+
+//-----------------------------------------------------------------------------
+void
+QGCCacheWorker::_disconnectExternalDatabases()
+{
+    QStringList connectionNames;
+    QList<int> fileDescriptors;
+    for(QGCExternalTileDatabase& external : _externalDatabases) {
+        connectionNames.append(external.connectionName);
+        fileDescriptors.append(external.fileDescriptor);
+        external.database.close();
+        external.database = QSqlDatabase();
+    }
+    _externalDatabases.clear();
+    for(const QString& connectionName : connectionNames) {
+        QSqlDatabase::removeDatabase(connectionName);
+    }
+    for(const int fileDescriptor : fileDescriptors) {
+        AndroidDocumentUtils::closeFileDescriptor(fileDescriptor);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -1175,6 +1692,19 @@ QGCCacheWorker::_createDB(QSqlDatabase& db, bool createDefault)
             }
         }
     }
+    if(res && !query.exec(
+        "CREATE TABLE IF NOT EXISTS ExternalTileSets ("
+        "setID INTEGER PRIMARY KEY NOT NULL, "
+        "sourceSetID INTEGER NOT NULL, "
+        "path TEXT NOT NULL)"))
+    {
+        qWarning() << "Map Cache SQL error (create ExternalTileSets db):" << query.lastError().text();
+        res = false;
+    }
+    if(res) {
+        query.exec("CREATE UNIQUE INDEX IF NOT EXISTS externalTileSetPath "
+                   "ON ExternalTileSets(path, sourceSetID)");
+    }
     //-- Create default tile set
     if(res && createDefault) {
         QString s = QString("SELECT name FROM TileSets WHERE name = \"%1\"").arg(kDefaultSet);
@@ -1204,6 +1734,7 @@ QGCCacheWorker::_createDB(QSqlDatabase& db, bool createDefault)
 void
 QGCCacheWorker::_disconnectDB()
 {
+    _disconnectExternalDatabases();
     if (_db) {
         _db.reset();
         QSqlDatabase::removeDatabase(kSession);

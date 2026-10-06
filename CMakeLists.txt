@@ -145,6 +145,16 @@ find_package(Qt5 ${QT_VERSION}
 		${QT_LIBRARY_HINTS}
 )
 
+if(ANDROID)
+	find_package(Qt5 ${QT_VERSION}
+		COMPONENTS
+			AndroidExtras
+		REQUIRED
+		HINTS
+			${QT_LIBRARY_HINTS}
+	)
+endif()
+
 if(NOT QT_MKSPEC MATCHES "winrt")
 	find_package(Qt5 ${QT_VERSION}
 		COMPONENTS

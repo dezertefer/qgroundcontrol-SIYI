@@ -214,6 +214,7 @@ Item {
         id:             fileDialog
         folder:         QGroundControl.settingsManager.appSettings.missionSavePath
         nameFilters:    ["Tile Sets (*.qgctiledb)"]
+        useAndroidDocumentPicker: true
 
         onAcceptedForSave: {
             if (QGroundControl.mapEngineManager.exportSets(file)) {
@@ -1306,15 +1307,21 @@ Item {
                 width:              ScreenTools.defaultFontPixelWidth * 24
                 anchors.horizontalCenter: parent.horizontalCenter
                 QGCRadioButton {
-                    text:           qsTr("Append to existing set")
+                    text:           qsTr("Add set (large files stay in place)")
                     checked:        !QGroundControl.mapEngineManager.importReplace
                     onClicked:      QGroundControl.mapEngineManager.importReplace = !checked
                     visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
                 }
                 QGCRadioButton {
-                    text:           qsTr("Replace existing set")
+                    text:           qsTr("Replace cache (copies the file)")
                     checked:        QGroundControl.mapEngineManager.importReplace
                     onClicked:      QGroundControl.mapEngineManager.importReplace = checked
+                    visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
+                }
+                QGCLabel {
+                    width:          parent.width
+                    wrapMode:       Text.WordWrap
+                    text:           qsTr("Packages of 512 MB or larger are read directly from their current location. Keep the drive or SD card connected.")
                     visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
                 }
             }
@@ -1339,6 +1346,10 @@ Item {
                         importDialog.close()
                         fileDialog.title = qsTr("Import Tile Set")
                         fileDialog.selectExisting = true
+                        if (ScreenTools.isMobile) {
+                            // Android document URIs are always mounted in place.
+                            QGroundControl.mapEngineManager.importReplace = false
+                        }
                         fileDialog.openForLoad()
                     }
                 }

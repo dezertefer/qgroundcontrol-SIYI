@@ -73,6 +73,7 @@ class ConverterTests(unittest.TestCase):
             timeout=5,
             retries=0,
             wms_format="image/png",
+            png_compress_level=6,
             skip_transparent=True,
         )
 

@@ -22,6 +22,7 @@
 #include <QString>
 #include <QThread>
 #include <QQueue>
+#include <QList>
 #include <QMutex>
 #include <QWaitCondition>
 #include <QMutexLocker>
@@ -34,6 +35,15 @@ Q_DECLARE_LOGGING_CATEGORY(QGCTileCacheLog)
 
 class QGCMapTask;
 class QGCCachedTileSet;
+
+struct QGCExternalTileDatabase
+{
+    QString         path;
+    QString         connectionName;
+    QSqlDatabase    database;
+    qint64          size = -1;
+    int             fileDescriptor = -1;
+};
 
 //-----------------------------------------------------------------------------
 class QGCCacheWorker : public QThread
@@ -78,6 +88,8 @@ private:
     void        _updateSetTotals        (QGCCachedTileSet* set);
     bool        _init                   ();
     bool        _connectDB              ();
+    void        _connectExternalDatabases();
+    void        _disconnectExternalDatabases();
     bool        _createDB               (QSqlDatabase& db, bool createDefault = true);
     void        _disconnectDB           ();
     quint64     _getDefaultTileSet      ();
@@ -94,6 +106,7 @@ private:
     QWaitCondition                  _waitc;
     QString                         _databasePath;
     QScopedPointer<QSqlDatabase>    _db;
+    QList<QGCExternalTileDatabase>  _externalDatabases;
     std::atomic_bool                _valid;
     bool                            _failed;
     quint64                         _defaultSet;

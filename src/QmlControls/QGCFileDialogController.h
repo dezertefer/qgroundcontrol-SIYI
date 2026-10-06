@@ -38,10 +38,17 @@ public:
 
     Q_INVOKABLE QString urlToLocalFile(QUrl url) { return url.toLocalFile(); }
 
+    /// Opens Android's Storage Access Framework document picker. The selected
+    /// content URI retains read permission across application restarts.
+    Q_INVOKABLE bool openAndroidDocument();
+
     /// Important: Should only be used in mobile builds where default save location cannot be changed.
     /// Returns the standard QGC location portion of a fully qualified folder path.
     /// Example: "/Users/Don/Document/QGroundControl/Missions" returns "QGroundControl/Missions"
     Q_INVOKABLE QString fullFolderPathToShortMobilePath(const QString& fullFolderPath);
+
+signals:
+    void androidDocumentSelected(const QString& uri);
 };
 
 #endif

@@ -33,6 +33,10 @@ target_link_libraries(QtLocationPlugin
 		qgc
 )
 
+if(ANDROID)
+	target_link_libraries(QtLocationPlugin PUBLIC Qt5::AndroidExtras)
+endif()
+
 target_include_directories(QtLocationPlugin
 	INTERFACE
 		${CMAKE_CURRENT_SOURCE_DIR}

@@ -110,6 +110,7 @@ class ConversionSettings:
     timeout: float
     retries: int
     wms_format: str
+    png_compress_level: int
     skip_transparent: bool
 
     def validate(self) -> None:
@@ -124,6 +125,8 @@ class ConversionSettings:
             raise ValueError("workers must be between 1 and 32")
         if self.timeout <= 0 or self.retries < 0:
             raise ValueError("timeout must be positive and retries cannot be negative")
+        if not (0 <= self.png_compress_level <= 9):
+            raise ValueError("png_compress_level must be between 0 and 9")
         if not (0 <= self.map_type_id <= 2_147_483_647):
             raise ValueError("map_type_id must fit QGC's signed 32-bit provider ID")
         for zoom in range(self.min_zoom, self.max_zoom + 1):
@@ -239,6 +242,7 @@ def plan_rows(settings: ConversionSettings) -> list[dict[str, object]]:
 
 def print_plan(settings: ConversionSettings) -> None:
     rows = plan_rows(settings)
+    candidate_tiles = sum(int(row["candidate_tiles"]) for row in rows)
     print("Zoom  Candidate tiles  WMS blocks  Layers")
     for row in rows:
         print(
@@ -246,10 +250,23 @@ def print_plan(settings: ConversionSettings) -> None:
             f"{row['blocks']:>10,}  {', '.join(row['layers'])}"
         )
     print(
-        f"TOTAL {sum(int(row['candidate_tiles']) for row in rows):>15,}  "
+        f"TOTAL {candidate_tiles:>15,}  "
         f"{sum(int(row['blocks']) for row in rows):>10,}"
     )
-    print("Candidate tiles are an upper bound; fully transparent tiles are omitted.")
+    if settings.skip_transparent:
+        print("Candidate tiles are an upper bound; fully transparent tiles are omitted.")
+    else:
+        print("Transparent tiles are retained, so every candidate tile will be stored.")
+    if settings.png_compress_level == 0:
+        sample = Image.new("RGBA", (TILE_SIZE, TILE_SIZE), (0, 0, 0, 0))
+        encoded = io.BytesIO()
+        sample.save(encoded, format="PNG", compress_level=0)
+        estimated_bytes = candidate_tiles * len(encoded.getvalue())
+        print(
+            "Estimated uncompressed RGBA tile payload: "
+            f"{estimated_bytes / 1_000_000_000:.2f} GB "
+            f"({estimated_bytes / (1024**3):.2f} GiB), before SQLite overhead."
+        )
 
 
 def build_wms_url(settings: ConversionSettings, block: TileBlock) -> str:
@@ -288,7 +305,10 @@ def _is_transparent(tile: Image.Image) -> bool:
 
 
 def split_block_png(
-    block: TileBlock, payload: bytes, skip_transparent: bool
+    block: TileBlock,
+    payload: bytes,
+    skip_transparent: bool,
+    png_compress_level: int = 6,
 ) -> tuple[tuple[int, int, bytes], ...]:
     expected_size = (block.width * TILE_SIZE, block.height * TILE_SIZE)
     try:
@@ -315,7 +335,11 @@ def split_block_png(
                     if skip_transparent and _is_transparent(tile):
                         continue
                     encoded = io.BytesIO()
-                    tile.save(encoded, format="PNG", compress_level=6)
+                    tile.save(
+                        encoded,
+                        format="PNG",
+                        compress_level=png_compress_level,
+                    )
                     output.append((block.x0 + column, block.y0 + row, encoded.getvalue()))
             return tuple(output)
     except UnidentifiedImageError as error:
@@ -332,7 +356,12 @@ def render_block(settings: ConversionSettings, block: TileBlock) -> RenderedBloc
             if content_type in {"text/xml", "application/xml", "text/html"}:
                 preview = payload[:1000].decode("utf-8", errors="replace")
                 raise RuntimeError(f"GeoServer error for {block.key}: {preview}")
-            tiles = split_block_png(block, payload, settings.skip_transparent)
+            tiles = split_block_png(
+                block,
+                payload,
+                settings.skip_transparent,
+                settings.png_compress_level,
+            )
             return RenderedBlock(block, tiles, len(payload))
         except (OSError, RuntimeError, urllib.error.URLError) as error:
             last_error = error
@@ -444,6 +473,7 @@ class QgcTileDatabase:
             "set_name": self.settings.set_name,
             "block_tiles": self.settings.block_tiles,
             "wms_format": self.settings.wms_format,
+            "png_compress_level": self.settings.png_compress_level,
             "skip_transparent": self.settings.skip_transparent,
         }
         encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -763,7 +793,8 @@ def build_settings(arguments: argparse.Namespace, config: dict[str, object]) -> 
         timeout=float(choose("timeout", 120.0)),
         retries=int(choose("retries", 3)),
         wms_format=str(choose("wms_format", "image/png")),
-        skip_transparent=not arguments.keep_transparent,
+        png_compress_level=int(choose("png_compress_level", 6)),
+        skip_transparent=not bool(choose("keep_transparent", False)),
     )
     settings.validate()
     return settings
@@ -790,7 +821,13 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--timeout", type=float)
     result.add_argument("--retries", type=int)
     result.add_argument("--wms-format", dest="wms_format")
-    result.add_argument("--keep-transparent", action="store_true")
+    result.add_argument(
+        "--png-compress-level",
+        dest="png_compress_level",
+        type=int,
+        help="PNG compression level from 0 (large/fast) to 9 (small/slow)",
+    )
+    result.add_argument("--keep-transparent", action="store_true", default=None)
     result.add_argument("--resume", action="store_true")
     result.add_argument("--plan", action="store_true", help="show request counts without connecting")
     result.add_argument(

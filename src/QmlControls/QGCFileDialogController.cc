@@ -12,12 +12,93 @@
 #include "QGCApplication.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
+#include "AndroidDocumentUtils.h"
 
 #include <QStandardPaths>
 #include <QDebug>
 #include <QDir>
+#include <QMetaObject>
+#include <QPointer>
 
 QGC_LOGGING_CATEGORY(QGCFileDialogControllerLog, "QGCFileDialogControllerLog")
+
+bool QGCFileDialogController::openAndroidDocument()
+{
+#if defined(Q_OS_ANDROID)
+    const QAndroidJniObject action = QAndroidJniObject::fromString(
+                QStringLiteral("android.intent.action.OPEN_DOCUMENT"));
+    QAndroidJniObject intent(
+                "android/content/Intent",
+                "(Ljava/lang/String;)V",
+                action.object<jstring>());
+    if(!intent.isValid() || AndroidDocumentUtils::clearException("Intent constructor")) {
+        return false;
+    }
+
+    const QAndroidJniObject openableCategory = QAndroidJniObject::fromString(
+                QStringLiteral("android.intent.category.OPENABLE"));
+    intent.callObjectMethod(
+                "addCategory",
+                "(Ljava/lang/String;)Landroid/content/Intent;",
+                openableCategory.object<jstring>());
+
+    const QAndroidJniObject mimeType = QAndroidJniObject::fromString(QStringLiteral("*/*"));
+    intent.callObjectMethod(
+                "setType",
+                "(Ljava/lang/String;)Landroid/content/Intent;",
+                mimeType.object<jstring>());
+
+    // Persistable read access is required so a mounted SD-card database can
+    // be opened again after QGC restarts.
+    constexpr jint grantReadUriPermission = 0x00000001;
+    constexpr jint grantPersistableUriPermission = 0x00000040;
+    intent.callObjectMethod(
+                "addFlags",
+                "(I)Landroid/content/Intent;",
+                grantReadUriPermission | grantPersistableUriPermission);
+    if(AndroidDocumentUtils::clearException("configure document picker intent")) {
+        return false;
+    }
+
+    QPointer<QGCFileDialogController> guard(this);
+    QtAndroid::startActivity(intent, 0x5147,
+        [guard](int, int resultCode, const QAndroidJniObject& resultData) {
+            QString selectedUri;
+            if(resultCode == -1 && resultData.isValid()) { // Activity.RESULT_OK
+                QAndroidJniObject uri = resultData.callObjectMethod(
+                            "getData",
+                            "()Landroid/net/Uri;");
+                if(uri.isValid() && !AndroidDocumentUtils::clearException("Intent.getData")) {
+                    QAndroidJniObject uriText = uri.callObjectMethod(
+                                "toString",
+                                "()Ljava/lang/String;");
+                    if(uriText.isValid() && !AndroidDocumentUtils::clearException("Uri.toString")) {
+                        selectedUri = uriText.toString();
+                        const int flags = resultData.callMethod<jint>("getFlags", "()I");
+                        const bool permissionPersisted =
+                                !AndroidDocumentUtils::clearException("Intent.getFlags")
+                                && AndroidDocumentUtils::takePersistableReadPermission(
+                                    selectedUri, flags);
+                        qInfo().noquote() << "[OfflineMapDebug] Android document selected"
+                                          << "uri=" << selectedUri
+                                          << "persistentReadPermission=" << permissionPersisted;
+                    }
+                }
+            }
+
+            if(guard) {
+                QMetaObject::invokeMethod(
+                            guard.data(),
+                            "androidDocumentSelected",
+                            Qt::QueuedConnection,
+                            Q_ARG(QString, selectedUri));
+            }
+        });
+    return true;
+#else
+    return false;
+#endif
+}
 
 QStringList QGCFileDialogController::getFiles(const QString& directoryPath, const QStringList& nameFilters)
 {

@@ -143,4 +143,8 @@ target_link_libraries(QmlControls
 		Qt5::Widgets
 )
 
+if(ANDROID)
+	target_link_libraries(QmlControls PUBLIC Qt5::AndroidExtras)
+endif()
+
 target_include_directories(QmlControls INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
