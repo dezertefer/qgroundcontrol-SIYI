@@ -1,0 +1,22 @@
+{
+  "wms_url": "http://127.0.0.1:8080/geoserver/wms",
+  "bounds": [165.0, -49.0, 180.0, -32.0],
+  "min_zoom": 0,
+  "max_zoom": 12,
+  "map_type": "Geoserver Map",
+  "map_type_id": 685018728,
+  "set_name": "00 New Zealand Overview",
+  "block_tiles": 8,
+  "workers": 2,
+  "timeout": 120,
+  "retries": 3,
+  "wms_format": "image/png",
+  "png_compress_level": 6,
+  "layer_rules": [
+    {
+      "min_zoom": 0,
+      "max_zoom": 12,
+      "layers": ["tiger:New Zealand merge"]
+    }
+  ]
+}

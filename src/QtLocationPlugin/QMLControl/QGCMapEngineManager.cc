@@ -24,6 +24,9 @@
 
 #include <QSettings>
 #include <QStorageInfo>
+#include <QDir>
+#include <QFileInfo>
+#include <QTimer>
 #include <stdio.h>
 
 QGC_LOGGING_CATEGORY(QGCMapEngineManagerLog, "QGCMapEngineManagerLog")
@@ -45,7 +48,8 @@ QGCMapEngineManager::QGCMapEngineManager(QGCApplication* app, QGCToolbox* toolbo
     , _fetchElevation(false)
     , _actionProgress(0)
     , _importAction(ActionNone)
-    , _importReplace(false)
+    , _importKeepInPlace(true)
+    , _pendingImportTasks(0)
 {
 
 }
@@ -65,6 +69,9 @@ QGCMapEngineManager::setToolbox(QGCToolbox *toolbox)
    qmlRegisterUncreatableType<QGCMapEngineManager>("QGroundControl.QGCMapEngineManager", 1, 0, "QGCMapEngineManager", "Reference only");
    connect(getQGCMapEngine(), &QGCMapEngine::updateTotals, this, &QGCMapEngineManager::_updateTotals);
    _updateDiskFreeSpace();
+   // QGCMapEngine::init runs immediately after toolbox setup. Queue the SD-card
+   // scan for the event loop so the FishMaps path and cache worker are ready.
+   QTimer::singleShot(0, this, &QGCMapEngineManager::scanOfflineMapDirectory);
 }
 
 //-----------------------------------------------------------------------------
@@ -153,6 +160,10 @@ QGCMapEngineManager::_tileSetFetched(QGCCachedTileSet* tileSet)
 void
 QGCMapEngineManager::startDownload(const QString& name, const QString& mapType)
 {
+    if(mapType.contains(QStringLiteral("Geoserver"), Qt::CaseInsensitive)) {
+        setErrorMessage(tr("Marine chart downloads are disabled. Get the prepared offline chart packages from Aerokontiki and place them in the SD-card folder shown on the Offline Maps page."));
+        return;
+    }
     if(_imageSet.tileSize) {
         QGCCachedTileSet* set = new QGCCachedTileSet(name);
         set->setMapTypeStr(mapType);
@@ -392,6 +403,9 @@ QGCMapEngineManager::taskError(QGCMapTask::TaskType type, QString error)
     case QGCMapTask::taskExport:
         task = "Export Tile Sets";
         break;
+    case QGCMapTask::taskImport:
+        task = "Import Tile Set";
+        break;
     case QGCMapTask::taskClearDefaultTileSet:
         task = "Clear Default Tile Set";
         break;
@@ -490,16 +504,60 @@ QGCMapEngineManager::importSets(QString path) {
 #endif
     }
     if(!dir.isEmpty()) {
-        _importAction = ActionImporting;
-        emit importActionChanged();
-        QGCImportTileTask* task = new QGCImportTileTask(dir, _importReplace);
-        connect(task, &QGCImportTileTask::actionCompleted, this, &QGCMapEngineManager::_actionCompleted);
-        connect(task, &QGCImportTileTask::actionProgress, this, &QGCMapEngineManager::_actionProgressHandler);
-        connect(task, &QGCMapTask::error, this, &QGCMapEngineManager::taskError);
-        getQGCMapEngine()->addTask(task);
-        return true;
+        return _queueImport(dir, _importKeepInPlace);
     }
     return false;
+}
+
+QString
+QGCMapEngineManager::offlineMapDirectory() const
+{
+    return getQGCMapEngine()->getOfflineMapDirectory();
+}
+
+bool
+QGCMapEngineManager::_queueImport(const QString& path, bool keepInPlace)
+{
+    if(path.isEmpty()) {
+        return false;
+    }
+    setErrorMessage(QString());
+    _importAction = ActionImporting;
+    _actionProgress = 0;
+    ++_pendingImportTasks;
+    emit importActionChanged();
+    emit actionProgressChanged();
+    QGCImportTileTask* task = new QGCImportTileTask(
+                path, keepInPlace, getQGCMapEngine()->getInternalOfflineMapDirectory());
+    connect(task, &QGCImportTileTask::actionCompleted, this, &QGCMapEngineManager::_actionCompleted);
+    connect(task, &QGCImportTileTask::actionProgress, this, &QGCMapEngineManager::_actionProgressHandler);
+    connect(task, &QGCMapTask::error, this, &QGCMapEngineManager::taskError);
+    getQGCMapEngine()->addTask(task);
+    return true;
+}
+
+void
+QGCMapEngineManager::scanOfflineMapDirectory()
+{
+    const QDir directory(offlineMapDirectory());
+    if(!directory.exists() || !QFileInfo(directory.absolutePath()).isReadable()) {
+        setErrorMessage(tr("The offline-map SD-card folder is not available: %1. Check that the SD card is inserted and accessible.")
+                        .arg(directory.absolutePath()));
+        loadTileSets();
+        return;
+    }
+    const QFileInfoList files = directory.entryInfoList(
+                QStringList() << QStringLiteral("*.qgctiledb"),
+                QDir::Files | QDir::Readable,
+                QDir::Name);
+    if(files.isEmpty()) {
+        loadTileSets();
+        return;
+    }
+    setErrorMessage(QString());
+    for(const QFileInfo& file : files) {
+        _queueImport(file.absoluteFilePath(), true);
+    }
 }
 
 bool QGCMapEngineManager::importGeoserverSets(QString path)
@@ -601,10 +659,21 @@ void
 QGCMapEngineManager::_actionCompleted()
 {
     ImportAction oldState = _importAction;
+    const bool completedImport = _pendingImportTasks > 0;
+    if(completedImport) {
+        --_pendingImportTasks;
+    }
+    if(completedImport && _pendingImportTasks > 0) {
+        if(_importAction != ActionImporting) {
+            _importAction = ActionImporting;
+            emit importActionChanged();
+        }
+        return;
+    }
     _importAction = ActionDone;
     emit importActionChanged();
     //-- If we just imported, reload it all
-    if(oldState == ActionImporting) {
+    if(completedImport || oldState == ActionImporting) {
         loadTileSets();
     }
 }
@@ -613,7 +682,7 @@ QGCMapEngineManager::_actionCompleted()
 void
 QGCMapEngineManager::resetAction()
 {
-    _importAction = ActionNone;
+    _importAction = _pendingImportTasks > 0 ? ActionImporting : ActionNone;
     emit importActionChanged();
 }
 

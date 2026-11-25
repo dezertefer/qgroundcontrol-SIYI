@@ -132,6 +132,14 @@ QGCCachedTileSet::downloadStatus()
 void
 QGCCachedTileSet::createDownloadTask()
 {
+    if(_type.contains(QStringLiteral("Geoserver"), Qt::CaseInsensitive)) {
+        _downloading = false;
+        emit downloadingChanged();
+        if(_manager) {
+            _manager->setErrorMessage(tr("Marine chart downloads are disabled. Use the prepared Aerokontiki packages from the SD-card offline-map folder."));
+        }
+        return;
+    }
     if(!_downloading) {
         _errorCount   = 0;
         _downloading  = true;

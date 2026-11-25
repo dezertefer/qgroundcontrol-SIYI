@@ -58,6 +58,7 @@ Item {
 
     property var    _mapAdjustedColor:  _map.isSatelliteMap ? "white" : "black"
     property bool   _tooManyTiles:      QGroundControl.mapEngineManager.tileCount > _maxTilesForDownload
+    property bool   _marineDownloadSelected: mapType.toLowerCase().indexOf("geoserver") !== -1
 
     readonly property real minZoomLevel:    1
     readonly property real maxZoomLevel:    20
@@ -77,9 +78,6 @@ Item {
         target: QGroundControl.mapEngineManager
         onTileSetsChanged: {
             setName.text = QGroundControl.mapEngineManager.getUniqueName()
-        }
-        onErrorMessageChanged: {
-            errorDialog.visible = true
         }
     }
 
@@ -614,7 +612,9 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         QGCButton {
                             text:       qsTr("Resume Download")
-                            visible:    offlineMapView._currentSelection && offlineMapView._currentSelection && !_defaultSet && (!offlineMapView._currentSelection.complete && !offlineMapView._currentSelection.downloading)
+                            visible:    offlineMapView._currentSelection && !_defaultSet
+                                        && offlineMapView._currentSelection.mapTypeStr.toLowerCase().indexOf("geoserver") === -1
+                                        && (!offlineMapView._currentSelection.complete && !offlineMapView._currentSelection.downloading)
                             width:      ScreenTools.defaultFontPixelWidth * 16
                             onClicked: {
                                 if(offlineMapView._currentSelection)
@@ -1008,6 +1008,24 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                     }
 
+                    Rectangle {
+                        anchors.left:   parent.left
+                        anchors.right:  parent.right
+                        height:         marineDownloadWarning.implicitHeight + ScreenTools.defaultFontPixelHeight
+                        color:          qgcPal.warningText
+                        opacity:        0.9
+                        visible:        _marineDownloadSelected
+                        radius:         ScreenTools.defaultFontPixelWidth * 0.5
+                        QGCLabel {
+                            id:                 marineDownloadWarning
+                            anchors.fill:       parent
+                            anchors.margins:    ScreenTools.defaultFontPixelHeight * 0.5
+                            wrapMode:           Text.WordWrap
+                            color:              qgcPal.window
+                            text:               qsTr("Marine chart downloads are disabled because GeoServer renders them too slowly. Get prepared offline marine chart packages from Aerokontiki and place them in the SD-card folder shown in Offline Maps.")
+                        }
+                    }
+
                     Row {
                         id: addButtonRow
                         spacing: ScreenTools.defaultFontPixelWidth
@@ -1015,7 +1033,7 @@ Item {
                         QGCButton {
                             text:       qsTr("Download")
                             width:      (addNewSetColumn.width * 0.5) - (addButtonRow.spacing * 0.5)
-                            enabled:    !_tooManyTiles && setName.text.length > 0
+                            enabled:    !_tooManyTiles && setName.text.length > 0 && !_marineDownloadSelected
                             onClicked: {
                                 if(QGroundControl.mapEngineManager.findName(setName.text)) {
                                     duplicateName.visible = true
@@ -1049,15 +1067,75 @@ Item {
             contentHeight:      _cacheList.height
             ButtonGroup {
                 id:             buttonGroup
-                buttons:        _cacheList.children
             }
             Column {
                 id:             _cacheList
                 width:          Math.min(_tileSetList.width, (ScreenTools.defaultFontPixelWidth  * 50).toFixed(0))
                 spacing:        ScreenTools.defaultFontPixelHeight * 0.5
                 anchors.horizontalCenter: parent.horizontalCenter
+                Rectangle {
+                    width:          _cacheList.width
+                    height:         importErrorColumn.height + ScreenTools.defaultFontPixelHeight
+                    visible:        QGroundControl.mapEngineManager.errorMessage.length > 0
+                    color:          qgcPal.warningText
+                    radius:         ScreenTools.defaultFontPixelWidth * 0.5
+                    Column {
+                        id:                 importErrorColumn
+                        anchors.left:       parent.left
+                        anchors.right:      parent.right
+                        anchors.top:        parent.top
+                        anchors.margins:    ScreenTools.defaultFontPixelHeight * 0.5
+                        spacing:            ScreenTools.defaultFontPixelHeight * 0.25
+                        QGCLabel {
+                            anchors.left:   parent.left
+                            anchors.right:  parent.right
+                            wrapMode:       Text.WordWrap
+                            color:          qgcPal.window
+                            text:           QGroundControl.mapEngineManager.errorMessage
+                        }
+                        QGCButton {
+                            text:           qsTr("Dismiss")
+                            anchors.right:  parent.right
+                            onClicked:      QGroundControl.mapEngineManager.clearErrorMessage()
+                        }
+                    }
+                }
+                Rectangle {
+                    width:          _cacheList.width
+                    height:         sdMapColumn.height + ScreenTools.defaultFontPixelHeight
+                    color:          qgcPal.windowShade
+                    border.color:   qgcPal.text
+                    radius:         ScreenTools.defaultFontPixelWidth * 0.5
+                    Column {
+                        id:                 sdMapColumn
+                        anchors.left:       parent.left
+                        anchors.right:      parent.right
+                        anchors.top:        parent.top
+                        anchors.margins:    ScreenTools.defaultFontPixelHeight * 0.5
+                        spacing:            ScreenTools.defaultFontPixelHeight * 0.25
+                        QGCLabel {
+                            anchors.left:   parent.left
+                            anchors.right:  parent.right
+                            wrapMode:       Text.WordWrap
+                            text:           qsTr("Marine charts are supplied as prepared offline packages by Aerokontiki. Place *.qgctiledb files in this SD-card folder; they stay there and are mounted without copying:")
+                        }
+                        QGCLabel {
+                            anchors.left:   parent.left
+                            anchors.right:  parent.right
+                            wrapMode:       Text.WrapAnywhere
+                            font.family:    ScreenTools.fixedFontFamily
+                            text:           QGroundControl.mapEngineManager.offlineMapDirectory
+                        }
+                        QGCButton {
+                            text:           qsTr("Scan SD-card folder")
+                            anchors.right:  parent.right
+                            onClicked:      QGroundControl.mapEngineManager.scanOfflineMapDirectory()
+                        }
+                    }
+                }
                 OfflineMapButton {
                     id:             firstButton
+                    ButtonGroup.group: buttonGroup
                     text:           qsTr("Add New Set")
                     width:          _cacheList.width
                     height:         ScreenTools.defaultFontPixelHeight * (ScreenTools.isMobile ? 3 : 2)
@@ -1071,6 +1149,7 @@ Item {
                 Repeater {
                     model: QGroundControl.mapEngineManager.tileSets
                     delegate: OfflineMapButton {
+                        ButtonGroup.group: buttonGroup
                         text:           object.name
                         size:           object.downloadStatus
                         tiles:          object.totalTileCount
@@ -1307,21 +1386,23 @@ Item {
                 width:              ScreenTools.defaultFontPixelWidth * 24
                 anchors.horizontalCenter: parent.horizontalCenter
                 QGCRadioButton {
-                    text:           qsTr("Add set (large files stay in place)")
-                    checked:        !QGroundControl.mapEngineManager.importReplace
-                    onClicked:      QGroundControl.mapEngineManager.importReplace = !checked
+                    text:           qsTr("Keep file in place")
+                    checked:        QGroundControl.mapEngineManager.importKeepInPlace
+                    onClicked:      QGroundControl.mapEngineManager.importKeepInPlace = checked
                     visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
                 }
                 QGCRadioButton {
-                    text:           qsTr("Replace cache (copies the file)")
-                    checked:        QGroundControl.mapEngineManager.importReplace
-                    onClicked:      QGroundControl.mapEngineManager.importReplace = checked
+                    text:           qsTr("Copy into device memory")
+                    checked:        !QGroundControl.mapEngineManager.importKeepInPlace
+                    onClicked:      QGroundControl.mapEngineManager.importKeepInPlace = !checked
                     visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
                 }
                 QGCLabel {
                     width:          parent.width
                     wrapMode:       Text.WordWrap
-                    text:           qsTr("Packages of 512 MB or larger are read directly from their current location. Keep the drive or SD card connected.")
+                    text:           QGroundControl.mapEngineManager.importKeepInPlace
+                                    ? qsTr("The selected database remains at its current location for any file size. Keep the SD card connected.")
+                                    : qsTr("The database is copied into device memory, then mounted as its own separate map entry. It is not merged into the default cache.")
                     visible:        QGroundControl.mapEngineManager.importAction === QGCMapEngineManager.ActionNone
                 }
             }
@@ -1346,10 +1427,6 @@ Item {
                         importDialog.close()
                         fileDialog.title = qsTr("Import Tile Set")
                         fileDialog.selectExisting = true
-                        if (ScreenTools.isMobile) {
-                            // Android document URIs are always mounted in place.
-                            QGroundControl.mapEngineManager.importReplace = false
-                        }
                         fileDialog.openForLoad()
                     }
                 }

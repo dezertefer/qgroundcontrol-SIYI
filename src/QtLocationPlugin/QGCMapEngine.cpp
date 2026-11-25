@@ -214,13 +214,27 @@ QGCMapEngine::init()
 #if defined(Q_OS_ANDROID)
     // Prefer SD card app-specific dir if present; else fall back to internal
     QString cacheDir = qgcPreferredMapCacheBaseAndroid(QLatin1String("/QGCMapCache" CACHE_PATH_VERSION));
+    _offlineMapDirectory = qgcPreferredMapCacheBaseAndroid(QStringLiteral("/FishMaps"));
+    _internalOfflineMapDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            + QStringLiteral("/QGCOfflineMapPackages");
 #elif defined(__mobile__)
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
                        + QLatin1String("/QGCMapCache" CACHE_PATH_VERSION);
+    _offlineMapDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            + QStringLiteral("/FishMaps");
+    _internalOfflineMapDirectory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            + QStringLiteral("/QGCOfflineMapPackages");
 #else
     QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
                        + QStringLiteral("/QGCMapCache" CACHE_PATH_VERSION);
+    _offlineMapDirectory = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+            + QStringLiteral("/FishMaps");
+    _internalOfflineMapDirectory = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+            + QStringLiteral("/QGCOfflineMapPackages");
 #endif
+
+    QDir().mkpath(_offlineMapDirectory);
+    QDir().mkpath(_internalOfflineMapDirectory);
 
     //-- Create directory if needed
     if (!QDir::root().mkpath(cacheDir)) {

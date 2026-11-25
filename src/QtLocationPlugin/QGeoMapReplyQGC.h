@@ -74,6 +74,7 @@ private slots:
 
 private:
     void _clearReply            ();
+    void _cancelCacheTask       ();
 
 private:
     QPointer<QNetworkReply> _reply;
@@ -82,6 +83,7 @@ private:
     QByteArray              _badMapbox;
     QByteArray              _badTile;
     QTimer                  _timer;
+    QPointer<QGCFetchTileTask> _cacheTask;
     static QByteArray       _bingNoTileImage;
     static int              _requestCount;
 };

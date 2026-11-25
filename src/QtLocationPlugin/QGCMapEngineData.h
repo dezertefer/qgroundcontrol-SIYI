@@ -23,6 +23,7 @@
 #include <QString>
 #include <QHash>
 #include <QDateTime>
+#include <atomic>
 
 #include "QGCMapUrlEngine.h"
 
@@ -212,6 +213,7 @@ public:
     QGCFetchTileTask(const QString hash)
         : QGCMapTask(QGCMapTask::taskFetchTile)
         , _hash(hash)
+        , _cancelled(false)
     {}
 
     ~QGCFetchTileTask()
@@ -224,12 +226,15 @@ public:
     }
 
     QString         hash() { return _hash; }
+    void            cancel() { _cancelled.store(true, std::memory_order_relaxed); }
+    bool            isCancelled() const { return _cancelled.load(std::memory_order_relaxed); }
 
 signals:
     void            tileFetched     (QGCCacheTile* tile);
 
 private:
     QString         _hash;
+    std::atomic_bool _cancelled;
 };
 
 //-----------------------------------------------------------------------------
@@ -450,18 +455,22 @@ class QGCImportTileTask : public QGCMapTask
 {
     Q_OBJECT
 public:
-    QGCImportTileTask(QString path, bool replace)
+    QGCImportTileTask(QString path, bool keepInPlace, QString deviceDirectory)
         : QGCMapTask(QGCMapTask::taskImport)
         , _path(path)
-        , _replace(replace)
+        , _keepInPlace(keepInPlace)
+        , _deviceDirectory(deviceDirectory)
     {}
 
     ~QGCImportTileTask()
     {
     }
 
-    QString                    path     () { return _path; }
-    bool                       replace  () const{ return _replace; }
+    QString                    path             () const { return _path; }
+    bool                       keepInPlace      () const { return _keepInPlace; }
+    QString                    deviceDirectory  () const { return _deviceDirectory; }
+    // Kept temporarily for the legacy import branch below the separate-package path.
+    bool                       replace          () const { return !_keepInPlace; }
 
     void setImportCompleted()
     {
@@ -475,7 +484,8 @@ public:
 
 private:
     QString                     _path;
-    bool                        _replace;
+    bool                        _keepInPlace;
+    QString                     _deviceDirectory;
 
 signals:
     void actionCompleted        ();

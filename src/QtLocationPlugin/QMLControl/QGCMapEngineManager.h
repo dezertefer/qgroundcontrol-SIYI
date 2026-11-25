@@ -56,8 +56,8 @@ public:
     Q_PROPERTY(int                  selectedCount   READ    selectedCount   NOTIFY selectedCountChanged)
     Q_PROPERTY(int                  actionProgress  READ    actionProgress  NOTIFY actionProgressChanged)
     Q_PROPERTY(ImportAction         importAction    READ    importAction    WRITE  setImportAction   NOTIFY importActionChanged)
-
-    Q_PROPERTY(bool                 importReplace   READ    importReplace   WRITE   setImportReplace   NOTIFY importReplaceChanged)
+    Q_PROPERTY(bool                 importKeepInPlace READ importKeepInPlace WRITE setImportKeepInPlace NOTIFY importKeepInPlaceChanged)
+    Q_PROPERTY(QString              offlineMapDirectory READ offlineMapDirectory CONSTANT)
 
     Q_INVOKABLE void                loadTileSets            ();
     Q_INVOKABLE void                updateForCurrentView    (double lon0, double lat0, double lon1, double lat1, int minZoom, int maxZoom, const QString& mapName);
@@ -72,6 +72,8 @@ public:
     Q_INVOKABLE void                selectNone              ();
     Q_INVOKABLE bool                exportSets              (QString path = QString());
     Q_INVOKABLE bool                importSets              (QString path = QString());
+    Q_INVOKABLE void                scanOfflineMapDirectory ();
+    Q_INVOKABLE void                clearErrorMessage       () { setErrorMessage(QString()); }
     Q_INVOKABLE bool                importGeoserverSets     (QString path = QString());
     Q_INVOKABLE void                resetAction             ();
 
@@ -92,11 +94,12 @@ public:
     int                             selectedCount           ();
     int                             actionProgress          () const{ return _actionProgress; }
     ImportAction                    importAction            () { return _importAction; }
-    bool                            importReplace           () const{ return _importReplace; }
+    bool                            importKeepInPlace       () const { return _importKeepInPlace; }
+    QString                         offlineMapDirectory     () const;
 
     void                            setMaxMemCache          (quint32 size);
     void                            setMaxDiskCache         (quint32 size);
-    void                            setImportReplace        (bool replace) { _importReplace = replace; emit importReplaceChanged(); }
+    void                            setImportKeepInPlace    (bool keep) { _importKeepInPlace = keep; emit importKeepInPlaceChanged(); }
     void                            setImportAction         (ImportAction action)  {_importAction = action; emit importActionChanged(); }
     void                            setErrorMessage         (const QString& error) { _errorMessage = error; emit errorMessageChanged(); }
     void                            setFetchElevation       (bool fetchElevation) { _fetchElevation = fetchElevation; emit fetchElevationChanged(); }
@@ -116,7 +119,7 @@ signals:
     void selectedCountChanged   ();
     void actionProgressChanged  ();
     void importActionChanged    ();
-    void importReplaceChanged   ();
+    void importKeepInPlaceChanged();
 
 public slots:
     void taskError              (QGCMapTask::TaskType type, QString error);
@@ -133,6 +136,7 @@ private slots:
 
 private:
     void _updateDiskFreeSpace   ();
+    bool _queueImport           (const QString& path, bool keepInPlace);
 
 private:
     QGCTileSet  _imageSet;
@@ -151,7 +155,8 @@ private:
     bool        _fetchElevation;
     int         _actionProgress;
     ImportAction _importAction;
-    bool        _importReplace;
+    bool        _importKeepInPlace;
+    int         _pendingImportTasks;
 };
 
 #endif

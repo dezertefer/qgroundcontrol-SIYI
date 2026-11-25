@@ -1,0 +1,110 @@
+{
+  "schema_version": 2,
+  "profile": "native-resolution-v2",
+  "geoserver_workspace_directory": "E:\\GeoServer\\GeoServer\\workspaces\\tiger",
+  "default_output_directory": "E:\\GeoServer\\QGCOfflineMaps\\NewZealand-Native-V2",
+  "packages": [
+    {
+      "slug": "00-new-zealand-overview",
+      "name": "00 New Zealand Overview",
+      "kind": "overview",
+      "bounds": [165.0, -49.0, 180.0, -32.0]
+    },
+    {
+      "slug": "01-northland",
+      "name": "01 Northland",
+      "kind": "north_detail",
+      "bounds": [171.5, -36.6, 175.2, -33.5]
+    },
+    {
+      "slug": "02-auckland",
+      "name": "02 Auckland",
+      "kind": "north_detail",
+      "bounds": [173.7, -37.5, 176.2, -35.8]
+    },
+    {
+      "slug": "03-waikato",
+      "name": "03 Waikato",
+      "kind": "north_detail",
+      "bounds": [173.3, -39.2, 176.6, -36.4]
+    },
+    {
+      "slug": "04-bay-of-plenty",
+      "name": "04 Bay of Plenty",
+      "kind": "north_detail",
+      "bounds": [175.1, -39.3, 178.7, -36.7]
+    },
+    {
+      "slug": "05-gisborne",
+      "name": "05 Gisborne",
+      "kind": "north_detail",
+      "bounds": [176.7, -39.8, 179.4, -37.1]
+    },
+    {
+      "slug": "06-hawkes-bay",
+      "name": "06 Hawke's Bay",
+      "kind": "north_detail",
+      "bounds": [175.5, -41.1, 178.9, -38.4]
+    },
+    {
+      "slug": "07-taranaki",
+      "name": "07 Taranaki",
+      "kind": "north_detail",
+      "bounds": [172.7, -40.3, 175.1, -38.2]
+    },
+    {
+      "slug": "08-manawatu-whanganui",
+      "name": "08 Manawatu-Whanganui",
+      "kind": "north_detail",
+      "bounds": [173.8, -41.3, 176.9, -38.4]
+    },
+    {
+      "slug": "09-wellington",
+      "name": "09 Wellington",
+      "kind": "north_detail",
+      "bounds": [173.7, -42.1, 176.4, -40.3]
+    },
+    {
+      "slug": "10-tasman",
+      "name": "10 Tasman",
+      "kind": "south_detail",
+      "bounds": [171.6, -42.2, 174.1, -39.8]
+    },
+    {
+      "slug": "11-nelson",
+      "name": "11 Nelson",
+      "kind": "south_detail",
+      "bounds": [172.2, -42.1, 174.3, -40.4]
+    },
+    {
+      "slug": "12-marlborough",
+      "name": "12 Marlborough",
+      "kind": "south_detail",
+      "bounds": [172.5, -43.0, 175.1, -40.2]
+    },
+    {
+      "slug": "13-west-coast",
+      "name": "13 West Coast",
+      "kind": "south_detail",
+      "bounds": [165.7, -45.2, 173.1, -40.4]
+    },
+    {
+      "slug": "14-canterbury",
+      "name": "14 Canterbury",
+      "kind": "south_detail",
+      "bounds": [168.8, -45.4, 174.7, -41.9]
+    },
+    {
+      "slug": "15-otago",
+      "name": "15 Otago",
+      "kind": "south_detail",
+      "bounds": [167.8, -47.1, 172.7, -43.4]
+    },
+    {
+      "slug": "16-southland",
+      "name": "16 Southland",
+      "kind": "south_detail",
+      "bounds": [165.3, -49.0, 171.0, -43.9]
+    }
+  ]
+}

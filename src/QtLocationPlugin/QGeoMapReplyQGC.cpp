@@ -47,6 +47,7 @@
 #include "QGCMapEngine.h"
 #include "QGeoMapReplyQGC.h"
 #include "QGeoTileFetcherQGC.h"
+#include "QGCTileCacheWorker.h"
 
 #include <QtLocation/private/qgeotilespec_p.h>
 #include <QtNetwork/QNetworkAccessManager>
@@ -95,7 +96,7 @@ void startOfflineMapNetworkBackoff(const QGeoTileSpec& spec, const char* reason)
     }
 
     offlineMapNetworkBackoffUntilMsecs = QDateTime::currentMSecsSinceEpoch() + kOfflineMapNetworkBackoffMsecs;
-    qInfo().noquote() << "[OfflineMapDebug] network BACKOFF"
+    qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] network BACKOFF"
                       << "reason=" << reason
                       << "durationMs=" << kOfflineMapNetworkBackoffMsecs;
 }
@@ -107,7 +108,7 @@ void logOfflineMapTile(const char* event, const QGeoTileSpec& spec, const QNetwo
     }
 
     const QString type = getQGCMapEngine()->urlFactory()->getTypeFromId(spec.mapId());
-    qInfo().noquote() << "[OfflineMapDebug]" << event
+    qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug]" << event
                       << "type=" << type
                       << "mapId=" << spec.mapId()
                       << "z/x/y=" << QStringLiteral("%1/%2/%3").arg(spec.zoom()).arg(spec.x()).arg(spec.y())
@@ -126,6 +127,7 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager
     , _reply(nullptr)
     , _request(request)
     , _networkManager(networkManager)
+    , _cacheTask(nullptr)
 {
     logOfflineMapTile("tile OPEN", spec, request);
     if (_bingNoTileImage.count() == 0) {
@@ -146,6 +148,7 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager
         setCached(false);
     } else {
         QGCFetchTileTask* task = getQGCMapEngine()->createFetchTileTask(getQGCMapEngine()->urlFactory()->getTypeFromId(spec.mapId()), spec.x(), spec.y(), spec.zoom());
+        _cacheTask = task;
         connect(task, &QGCFetchTileTask::tileFetched, this, &QGeoTiledMapReplyQGC::cacheReply);
         connect(task, &QGCMapTask::error, this, &QGeoTiledMapReplyQGC::cacheError);
         getQGCMapEngine()->addTask(task);
@@ -155,7 +158,19 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager
 //-----------------------------------------------------------------------------
 QGeoTiledMapReplyQGC::~QGeoTiledMapReplyQGC()
 {
+    _cancelCacheTask();
     _clearReply();
+}
+
+//-----------------------------------------------------------------------------
+void
+QGeoTiledMapReplyQGC::_cancelCacheTask()
+{
+    if(_cacheTask) {
+        disconnect(_cacheTask, nullptr, this, nullptr);
+        _cacheTask->cancel();
+        _cacheTask.clear();
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -181,6 +196,8 @@ QGeoTiledMapReplyQGC::abort()
     if(isOfflineMapDebugTile(tileSpec())) {
         logOfflineMapTile("tile ABORT", tileSpec(), _request);
     }
+
+    _cancelCacheTask();
 
     // QNetworkReply::abort() can enter Qt's HTTP backend after its internal
     // request has already been removed. Disconnect and defer deletion instead.
@@ -211,7 +228,7 @@ QGeoTiledMapReplyQGC::networkReplyFinished()
     UrlFactory* urlFactory = getQGCMapEngine()->urlFactory();
     QString format = urlFactory->getImageFormat(tileSpec().mapId(), a);
     if(isOfflineMapDebugTile(tileSpec())) {
-        qInfo().noquote() << "[OfflineMapDebug] network PAYLOAD"
+        qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] network PAYLOAD"
                           << "z/x/y=" << QStringLiteral("%1/%2/%3").arg(tileSpec().zoom()).arg(tileSpec().x()).arg(tileSpec().y())
                           << "format=" << format
                           << "bytes=" << a.size()
@@ -255,7 +272,7 @@ QGeoTiledMapReplyQGC::networkReplyError(QNetworkReply::NetworkError error)
 {
     _timer.stop();
     if(isOfflineMapDebugTile(tileSpec())) {
-        qInfo().noquote() << "[OfflineMapDebug] network ERROR"
+        qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] network ERROR"
                           << "z/x/y=" << QStringLiteral("%1/%2/%3").arg(tileSpec().zoom()).arg(tileSpec().x()).arg(tileSpec().y())
                           << "code=" << error
                           << "message=" << (_reply ? _reply->errorString() : QStringLiteral("reply already cleared"));
@@ -284,8 +301,9 @@ QGeoTiledMapReplyQGC::networkReplyError(QNetworkReply::NetworkError error)
 void
 QGeoTiledMapReplyQGC::cacheError(QGCMapTask::TaskType type, QString errorString)
 {
+    _cacheTask.clear();
     if(isOfflineMapDebugTile(tileSpec())) {
-        qInfo().noquote() << "[OfflineMapDebug] cache reply MISS"
+        qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] cache reply MISS"
                           << "z/x/y=" << QStringLiteral("%1/%2/%3").arg(tileSpec().zoom()).arg(tileSpec().x()).arg(tileSpec().y())
                           << "error=" << errorString
                           << "internetActive=" << getQGCMapEngine()->isInternetActive();
@@ -305,7 +323,7 @@ QGeoTiledMapReplyQGC::cacheError(QGCMapTask::TaskType type, QString errorString)
         if(isOfflineMapDebugTile(tileSpec())) {
             const qint64 backoffRemaining = offlineMapNetworkBackoffRemainingMsecs();
             if(backoffRemaining > 0) {
-                qInfo().noquote() << "[OfflineMapDebug] network SKIPPED"
+                qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] network SKIPPED"
                                   << "reason=backoff"
                                   << "remainingMs=" << backoffRemaining;
                 setError(QGeoTiledMapReply::CommunicationError, "GeoServer temporarily unavailable");
@@ -313,7 +331,7 @@ QGeoTiledMapReplyQGC::cacheError(QGCMapTask::TaskType type, QString errorString)
                 return;
             }
             if(_requestCount >= kOfflineMapMaxNetworkRequests) {
-                qInfo().noquote() << "[OfflineMapDebug] network SKIPPED"
+                qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] network SKIPPED"
                                   << "reason=request-limit"
                                   << "pending=" << _requestCount;
                 setError(QGeoTiledMapReply::CommunicationError, "Too many pending GeoServer tile requests");
@@ -349,8 +367,9 @@ QGeoTiledMapReplyQGC::cacheError(QGCMapTask::TaskType type, QString errorString)
 void
 QGeoTiledMapReplyQGC::cacheReply(QGCCacheTile* tile)
 {
+    _cacheTask.clear();
     if(isOfflineMapDebugTile(tileSpec())) {
-        qInfo().noquote() << "[OfflineMapDebug] cache reply HIT"
+        qCDebug(QGCTileCacheLog).noquote() << "[OfflineMapDebug] cache reply HIT"
                           << "z/x/y=" << QStringLiteral("%1/%2/%3").arg(tileSpec().zoom()).arg(tileSpec().x()).arg(tileSpec().y())
                           << "hash=" << tile->hash()
                           << "type=" << tile->type()

@@ -28,6 +28,7 @@
 #include <QMutexLocker>
 #include <QtSql/QSqlDatabase>
 #include <QHostInfo>
+#include <QCache>
 
 #include "QGCLoggingCategory.h"
 
@@ -36,6 +37,17 @@ Q_DECLARE_LOGGING_CATEGORY(QGCTileCacheLog)
 class QGCMapTask;
 class QGCCachedTileSet;
 
+struct QGCExternalTileCoverage
+{
+    double          topLat = 0.0;
+    double          leftLon = 0.0;
+    double          bottomLat = 0.0;
+    double          rightLon = 0.0;
+    int             minZoom = 0;
+    int             maxZoom = 0;
+    int             typeId = 0;
+};
+
 struct QGCExternalTileDatabase
 {
     QString         path;
@@ -43,6 +55,7 @@ struct QGCExternalTileDatabase
     QSqlDatabase    database;
     qint64          size = -1;
     int             fileDescriptor = -1;
+    QList<QGCExternalTileCoverage> coverage;
 };
 
 //-----------------------------------------------------------------------------
@@ -90,6 +103,8 @@ private:
     bool        _connectDB              ();
     void        _connectExternalDatabases();
     void        _disconnectExternalDatabases();
+    bool        _externalMayContainTile(const QGCExternalTileDatabase& external,
+                                        int typeId, int x, int y, int zoom) const;
     bool        _createDB               (QSqlDatabase& db, bool createDefault = true);
     void        _disconnectDB           ();
     quint64     _getDefaultTileSet      ();
@@ -107,6 +122,7 @@ private:
     QString                         _databasePath;
     QScopedPointer<QSqlDatabase>    _db;
     QList<QGCExternalTileDatabase>  _externalDatabases;
+    QCache<QString, QByteArray>     _fallbackTileCache;
     std::atomic_bool                _valid;
     bool                            _failed;
     quint64                         _defaultSet;

@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
 *.qgctiledb
+*.qgctiledb.partial
 *.qgctiledb-shm
 *.qgctiledb-wal
+*.qgctiledb.manifest.json
+*.qgctiledb.progress.json
+*.qgctiledb.pause

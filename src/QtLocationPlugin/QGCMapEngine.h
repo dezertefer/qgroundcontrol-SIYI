@@ -49,6 +49,8 @@ public:
     void                        setMaxMemCache      (quint32 size);
     const QString               getCachePath        () { return _cachePath; }
     const QString               getCacheFilename    () { return _cacheFile; }
+    const QString               getOfflineMapDirectory() const { return _offlineMapDirectory; }
+    const QString               getInternalOfflineMapDirectory() const { return _internalOfflineMapDirectory; }
     void                        testInternet        ();
     bool                        wasCacheReset       () const{ return _cacheWasReset; }
     bool                        isInternetActive    () const{ return _isInternetActive; }
@@ -82,6 +84,8 @@ private:
     QGCCacheWorker          _worker;
     QString                 _cachePath;
     QString                 _cacheFile;
+    QString                 _offlineMapDirectory;
+    QString                 _internalOfflineMapDirectory;
     UrlFactory*             _urlFactory;
     QString                 _userAgent;
     quint32                 _maxDiskCache;

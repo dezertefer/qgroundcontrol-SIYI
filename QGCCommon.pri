@@ -157,7 +157,7 @@ StableBuild {
 }
 
 # Fish Maps release version. Increment this value for each public app release.
-FISHMAPS_VERSION = 2.0.2
+FISHMAPS_VERSION = 2.0.5
 
 APP_VERSION_STR = $${FISHMAPS_VERSION}
 VERSION         = $${FISHMAPS_VERSION}
